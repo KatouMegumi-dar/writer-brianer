@@ -25,7 +25,11 @@
             cache: new Map(),
             activeWorld: null,
             worldList: []
-        }
+        },
+        // API实例和模型选择状态
+        selectedEndpointId: null,
+        selectedModel: null,
+        availableModels: []
     };
 
     function getConfig() {
@@ -60,8 +64,16 @@
         state.elements.worldPop = root.querySelector('#wbap-opt-world-pop');
         state.elements.worldList = root.querySelector('#wbap-opt-world-list');
         state.elements.entryList = root.querySelector('#wbap-opt-entry-list');
-        state.elements.endpointSelect = root.querySelector('#wbap-opt-endpoint-select');
-        state.elements.modelSelect = root.querySelector('#wbap-opt-model-select');
+        // API实例弹窗元素
+        state.elements.endpointBtn = root.querySelector('#wbap-opt-endpoint-btn');
+        state.elements.endpointLabel = root.querySelector('#wbap-opt-endpoint-label');
+        state.elements.endpointPop = root.querySelector('#wbap-opt-endpoint-pop');
+        state.elements.endpointList = root.querySelector('#wbap-opt-endpoint-list');
+        // 模型弹窗元素
+        state.elements.modelBtn = root.querySelector('#wbap-opt-model-btn');
+        state.elements.modelLabel = root.querySelector('#wbap-opt-model-label');
+        state.elements.modelPop = root.querySelector('#wbap-opt-model-pop');
+        state.elements.modelList = root.querySelector('#wbap-opt-model-list');
         state.elements.modelRefresh = root.querySelector('#wbap-opt-model-refresh');
 
         bindPanelEvents();
@@ -89,16 +101,24 @@
             input.addEventListener('input', autoResizeInput);
         }
 
-        state.elements.endpointSelect?.addEventListener('change', () => refreshModelOptions());
-        modelRefresh?.addEventListener('click', refreshModelList);
+        // 世界书弹窗事件
         if (worldBtn) {
             worldBtn.addEventListener('click', toggleWorldPopover);
         }
-        const pop = state.elements.worldPop;
-        pop?.querySelector('#wbap-opt-world-close')?.addEventListener('click', hideWorldPopover);
-        pop?.querySelector('#wbap-opt-world-refresh')?.addEventListener('click', () => loadWorldList(true));
-        pop?.querySelector('#wbap-opt-world-apply')?.addEventListener('click', hideWorldPopover);
-        pop?.querySelector('#wbap-opt-world-clear')?.addEventListener('click', clearWorldSelection);
+        const worldPop = state.elements.worldPop;
+        worldPop?.querySelector('#wbap-opt-world-close')?.addEventListener('click', hideWorldPopover);
+        worldPop?.querySelector('#wbap-opt-world-refresh')?.addEventListener('click', () => loadWorldList(true));
+        worldPop?.querySelector('#wbap-opt-world-apply')?.addEventListener('click', hideWorldPopover);
+        worldPop?.querySelector('#wbap-opt-world-clear')?.addEventListener('click', clearWorldSelection);
+
+        // API实例弹窗事件
+        state.elements.endpointBtn?.addEventListener('click', toggleEndpointPopover);
+        root.querySelector('#wbap-opt-endpoint-close')?.addEventListener('click', hideEndpointPopover);
+
+        // 模型弹窗事件
+        state.elements.modelBtn?.addEventListener('click', toggleModelPopover);
+        root.querySelector('#wbap-opt-model-close')?.addEventListener('click', hideModelPopover);
+        modelRefresh?.addEventListener('click', handleRefreshModelList);
 
         // 点击遮罩关闭预览
         previewOverlay?.addEventListener('click', (e) => {
@@ -159,8 +179,9 @@
         root.classList.remove('wbap-hidden');
         loadWorldList(false);
         updateWorldLabel();
-        refreshEndpointOptions();
-        refreshModelOptions();
+        // 初始化API实例和模型状态
+        renderEndpointList();
+        loadCurrentEndpointModel();
         if (prefillText && state.elements.input) {
             state.elements.input.value = prefillText;
             autoResizeInput();
@@ -355,69 +376,170 @@
         labelEl.textContent = count > 0 ? `世界书 (${count})` : '世界书';
     }
 
-    function refreshEndpointOptions() {
-        const select = state.elements.endpointSelect;
-        if (!select) return;
+    // ==================== API实例弹窗逻辑 ====================
+    function toggleEndpointPopover() {
+        const pop = state.elements.endpointPop;
+        if (!pop) return;
+        const isOpen = !pop.classList.contains('wbap-hidden');
+        if (isOpen) {
+            hideEndpointPopover();
+        } else {
+            hideModelPopover(); // 关闭其他弹窗
+            hideWorldPopover();
+            pop.classList.remove('wbap-hidden');
+            renderEndpointList();
+        }
+    }
+
+    function hideEndpointPopover() {
+        const pop = state.elements.endpointPop;
+        if (pop) pop.classList.add('wbap-hidden');
+    }
+
+    function renderEndpointList() {
+        const list = state.elements.endpointList;
+        if (!list) return;
+        list.innerHTML = '';
+
         const cfg = getConfig();
         const optCfg = cfg.optimizationApiConfig || {};
-        select.innerHTML = '';
 
+        // 独立API模式
         if (optCfg.useIndependentProfile) {
             const label = optCfg.apiUrl ? '独立 API' : '独立 API（未配置）';
-            select.innerHTML = `<option value="__independent__">${label}</option>`;
-            select.disabled = true;
+            list.innerHTML = `
+                <div class="wbap-opt-radio-item selected" data-id="__independent__">
+                    <span class="wbap-opt-radio-item-text">${escapeHtml(label)}</span>
+                </div>
+            `;
+            state.selectedEndpointId = '__independent__';
+            updateEndpointLabel();
             return;
         }
 
+        // 获取可用端点
         const endpoints = (cfg.selectiveMode?.apiEndpoints || []).filter(ep => ep.enabled !== false);
         if (endpoints.length === 0) {
-            select.innerHTML = '<option value="">请先配置 API</option>';
-            select.disabled = true;
+            list.innerHTML = '<div class="wbap-opt-empty">请先在设置中配置 API 实例</div>';
+            state.selectedEndpointId = null;
+            updateEndpointLabel();
             return;
         }
-        select.disabled = false;
+
+        // 确保有默认选中
+        if (!state.selectedEndpointId || !endpoints.find(ep => ep.id === state.selectedEndpointId)) {
+            state.selectedEndpointId = optCfg.selectedEndpointId || endpoints[0].id;
+        }
+
         endpoints.forEach(ep => {
-            const opt = document.createElement('option');
-            opt.value = ep.id;
-            opt.textContent = ep.name || ep.id;
-            select.appendChild(opt);
+            const div = document.createElement('div');
+            div.className = 'wbap-opt-radio-item' + (ep.id === state.selectedEndpointId ? ' selected' : '');
+            div.dataset.id = ep.id;
+            div.innerHTML = `<span class="wbap-opt-radio-item-text">${escapeHtml(ep.name || ep.id)}</span>`;
+            div.addEventListener('click', () => selectEndpoint(ep.id));
+            list.appendChild(div);
         });
-        const fallback = optCfg.selectedEndpointId || endpoints[0].id;
-        select.value = fallback;
+
+        updateEndpointLabel();
     }
 
-    function refreshModelOptions() {
-        const modelSelect = state.elements.modelSelect;
-        if (!modelSelect) return;
+    function selectEndpoint(endpointId) {
+        state.selectedEndpointId = endpointId;
+        renderEndpointList();
+        hideEndpointPopover();
+        // 切换API后重新渲染模型列表
+        loadCurrentEndpointModel();
+        updateEndpointLabel();
+    }
+
+    function updateEndpointLabel() {
+        const label = state.elements.endpointLabel;
+        if (!label) return;
+
         const cfg = getConfig();
         const optCfg = cfg.optimizationApiConfig || {};
-        const useIndependent = optCfg.useIndependentProfile === true;
-        const selectedEpId = state.elements.endpointSelect?.value;
 
-        modelSelect.innerHTML = '';
-
-        if (useIndependent) {
-            const model = optCfg.model || '';
-            modelSelect.appendChild(createModelOption(model || '', model || '未配置模型'));
-            modelSelect.disabled = false;
-            modelSelect.value = model;
+        if (optCfg.useIndependentProfile) {
+            label.textContent = optCfg.apiUrl ? '独立 API' : 'API（未配置）';
             return;
         }
 
         const endpoints = (cfg.selectiveMode?.apiEndpoints || []).filter(ep => ep.enabled !== false);
-        const target = endpoints.find(ep => ep.id === selectedEpId) || endpoints[0];
-        const modelName = target?.model || optCfg.model || '';
-        if (target) {
-            modelSelect.appendChild(createModelOption(modelName, modelName || '未配置模型'));
-            modelSelect.disabled = false;
-            modelSelect.value = modelName;
+        const target = endpoints.find(ep => ep.id === state.selectedEndpointId);
+        label.textContent = target ? (target.name || target.id) : 'API 实例';
+    }
+
+    function loadCurrentEndpointModel() {
+        const cfg = getConfig();
+        const optCfg = cfg.optimizationApiConfig || {};
+
+        if (optCfg.useIndependentProfile) {
+            state.selectedModel = optCfg.model || '';
+            state.availableModels = state.selectedModel ? [state.selectedModel] : [];
         } else {
-            modelSelect.appendChild(createModelOption('', '请先选择 API'));
-            modelSelect.disabled = true;
+            const endpoints = (cfg.selectiveMode?.apiEndpoints || []).filter(ep => ep.enabled !== false);
+            const target = endpoints.find(ep => ep.id === state.selectedEndpointId) || endpoints[0];
+            state.selectedModel = target?.model || '';
+            state.availableModels = state.selectedModel ? [state.selectedModel] : [];
+        }
+        updateModelLabel();
+    }
+
+    // ==================== 模型弹窗逻辑 ====================
+    function toggleModelPopover() {
+        const pop = state.elements.modelPop;
+        if (!pop) return;
+        const isOpen = !pop.classList.contains('wbap-hidden');
+        if (isOpen) {
+            hideModelPopover();
+        } else {
+            hideEndpointPopover(); // 关闭其他弹窗
+            hideWorldPopover();
+            pop.classList.remove('wbap-hidden');
+            renderModelList();
         }
     }
 
-    async function refreshModelList() {
+    function hideModelPopover() {
+        const pop = state.elements.modelPop;
+        if (pop) pop.classList.add('wbap-hidden');
+    }
+
+    function renderModelList() {
+        const list = state.elements.modelList;
+        if (!list) return;
+        list.innerHTML = '';
+
+        const models = state.availableModels || [];
+        if (models.length === 0) {
+            list.innerHTML = '<div class="wbap-opt-empty">点击"刷新"获取可用模型</div>';
+            return;
+        }
+
+        models.forEach(m => {
+            const div = document.createElement('div');
+            div.className = 'wbap-opt-radio-item' + (m === state.selectedModel ? ' selected' : '');
+            div.dataset.model = m;
+            div.innerHTML = `<span class="wbap-opt-radio-item-text">${escapeHtml(m)}</span>`;
+            div.addEventListener('click', () => selectModel(m));
+            list.appendChild(div);
+        });
+    }
+
+    function selectModel(modelName) {
+        state.selectedModel = modelName;
+        renderModelList();
+        hideModelPopover();
+        updateModelLabel();
+    }
+
+    function updateModelLabel() {
+        const label = state.elements.modelLabel;
+        if (!label) return;
+        label.textContent = state.selectedModel || '模型';
+    }
+
+    async function handleRefreshModelList() {
         const btn = state.elements.modelRefresh;
         if (btn) {
             btn.disabled = true;
@@ -428,19 +550,30 @@
             const optCfg = cfg.optimizationApiConfig || {};
             let apiUrl = '';
             let apiKey = '';
+
             if (optCfg.useIndependentProfile) {
                 apiUrl = optCfg.apiUrl || '';
                 apiKey = optCfg.apiKey || '';
             } else {
                 const endpoints = (cfg.selectiveMode?.apiEndpoints || []).filter(ep => ep.enabled !== false);
-                const target = endpoints.find(ep => ep.id === state.elements.endpointSelect?.value) || endpoints[0];
+                const target = endpoints.find(ep => ep.id === state.selectedEndpointId) || endpoints[0];
                 apiUrl = target?.apiUrl || target?.url || '';
                 apiKey = target?.apiKey || target?.key || '';
             }
+
             if (!apiUrl) throw new Error('请先配置 API URL');
+
             const result = await WBAP.fetchEndpointModels({ apiUrl, apiKey });
             if (result.success) {
-                populateModelSelect(result.models || [], state.elements.modelSelect?.value || '');
+                state.availableModels = result.models || [];
+                // 如果当前选中的模型不在新列表中，选择第一个
+                if (state.availableModels.length > 0) {
+                    if (!state.availableModels.includes(state.selectedModel)) {
+                        state.selectedModel = state.availableModels[0];
+                    }
+                }
+                renderModelList();
+                updateModelLabel();
             } else {
                 throw new Error(result.message || '获取模型失败');
             }
@@ -455,35 +588,7 @@
         }
     }
 
-    function populateModelSelect(models = [], currentModel = '') {
-        const select = state.elements.modelSelect;
-        if (!select) return;
-        select.innerHTML = '';
-        if (!models.length && currentModel) {
-            select.appendChild(createModelOption(currentModel, currentModel));
-            select.value = currentModel;
-            return;
-        }
-        if (!models.length) {
-            select.appendChild(createModelOption('', '未获取到模型'));
-            select.disabled = true;
-            return;
-        }
-        select.disabled = false;
-        models.forEach(m => select.appendChild(createModelOption(m, m)));
-        if (currentModel && models.includes(currentModel)) {
-            select.value = currentModel;
-        } else {
-            select.selectedIndex = 0;
-        }
-    }
 
-    function createModelOption(value, label) {
-        const opt = document.createElement('option');
-        opt.value = value || '';
-        opt.textContent = label || value || '';
-        return opt;
-    }
 
     async function handleSend() {
         if (state.sending) return;
@@ -591,9 +696,8 @@
         if (endpoints.length === 0) {
             throw new Error('请先配置并启用 API 实例');
         }
-        const selectedId = state.elements.endpointSelect?.value;
-        const target = endpoints.find(ep => ep.id === selectedId) || endpoints[0];
-        const model = state.elements.modelSelect?.value || target.model;
+        const target = endpoints.find(ep => ep.id === state.selectedEndpointId) || endpoints[0];
+        const model = state.selectedModel || target.model;
         return { apiConfig: target, model };
     }
 

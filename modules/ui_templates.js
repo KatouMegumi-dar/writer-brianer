@@ -526,7 +526,7 @@
 </div>
 `;
 
-const PROGRESS_PANEL_HTML = `
+    const PROGRESS_PANEL_HTML = `
 <div id="wbap-progress-panel" class="wbap-progress-panel">
     <button id="wbap-progress-close" class="wbap-progress-close" title="关闭">&times;</button>
     <div class="wbap-progress-content">
@@ -599,15 +599,50 @@ const PROGRESS_PANEL_HTML = `
                         <button id="wbap-opt-world-apply" class="wbap-opt-mini-btn wbap-opt-mini-primary" type="button">完成</button>
                     </div>
                 </div>
-                <div class="wbap-opt-chip">
+                <!-- API 实例选择按钮 + 弹窗 -->
+                <button class="wbap-opt-chip wbap-opt-chip-btn" id="wbap-opt-endpoint-btn" type="button">
                     <i class="fa-solid fa-server"></i>
-                    <select id="wbap-opt-endpoint-select" class="wbap-opt-select"></select>
+                    <span id="wbap-opt-endpoint-label">API 实例</span>
+                </button>
+                <div id="wbap-opt-endpoint-pop" class="wbap-opt-popover wbap-opt-popover-sm wbap-hidden">
+                    <div class="wbap-opt-pop-header">
+                        <div>选择 API 实例</div>
+                        <button id="wbap-opt-endpoint-close" class="wbap-opt-icon-btn" type="button">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div class="wbap-opt-pop-body-single">
+                        <div id="wbap-opt-endpoint-list" class="wbap-opt-list"></div>
+                    </div>
                 </div>
-                <div class="wbap-opt-chip">
+                <!-- 模型选择按钮 + 弹窗 -->
+                <button class="wbap-opt-chip wbap-opt-chip-btn" id="wbap-opt-model-btn" type="button">
                     <i class="fa-solid fa-microchip"></i>
-                    <select id="wbap-opt-model-select" class="wbap-opt-select"></select>
-                    <button id="wbap-opt-model-refresh" class="wbap-opt-mini-btn" type="button">刷新</button>
+                    <span id="wbap-opt-model-label">模型</span>
+                </button>
+                <div id="wbap-opt-model-pop" class="wbap-opt-popover wbap-opt-popover-sm wbap-hidden">
+                    <div class="wbap-opt-pop-header">
+                        <div>选择模型</div>
+                        <div class="wbap-opt-pop-actions">
+                            <button id="wbap-opt-model-refresh" class="wbap-opt-mini-btn" type="button">刷新</button>
+                            <button id="wbap-opt-model-close" class="wbap-opt-icon-btn" type="button">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="wbap-opt-pop-body-single">
+                        <div id="wbap-opt-model-list" class="wbap-opt-list"></div>
+                    </div>
                 </div>
+                <!-- 操作按钮 -->
+                <button class="wbap-opt-chip wbap-opt-chip-btn wbap-opt-action-regen" id="wbap-opt-regen" type="button" title="重新生成">
+                    <i class="fa-solid fa-rotate"></i>
+                    <span>重试</span>
+                </button>
+                <button class="wbap-opt-chip wbap-opt-chip-btn wbap-opt-action-cancel wbap-hidden" id="wbap-opt-cancel" type="button" title="取消生成">
+                    <i class="fa-solid fa-stop"></i>
+                    <span>取消</span>
+                </button>
             </div>
             <div class="wbap-opt-input-row">
                 <textarea id="wbap-opt-input" class="wbap-opt-input" rows="1" placeholder="在此输入..."></textarea>

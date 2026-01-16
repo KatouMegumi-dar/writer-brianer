@@ -1935,7 +1935,9 @@ html.wbap-overlay-open {
     min-height: 0;
     padding: 0 16px 0;
     position: relative;
-    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    /* overflow: hidden 已移除，由子元素 .wbap-opt-chat-stream 处理滚动 */
 }
 
 .wbap-opt-chat-stream {
@@ -2017,7 +2019,13 @@ html.wbap-overlay-open {
 .wbap-opt-toolbar {
     display: flex;
     gap: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    -webkit-overflow-scrolling: touch;
 }
 
 .wbap-opt-chip {
@@ -2030,11 +2038,46 @@ html.wbap-overlay-open {
     border: 1px solid rgba(255, 255, 255, 0.08);
     color: #dbe5ff;
     font-size: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .wbap-opt-chip-btn {
     cursor: pointer;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.15s ease;
+}
+
+.wbap-opt-chip-btn:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: linear-gradient(120deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+    transform: translateY(-1px);
+}
+
+/* 重新生成按钮 */
+.wbap-opt-action-regen {
+    background: linear-gradient(135deg, rgba(102, 166, 255, 0.25), rgba(109, 222, 255, 0.15));
+    border-color: rgba(102, 166, 255, 0.4);
+    color: #a5d4ff;
+}
+
+.wbap-opt-action-regen:hover {
+    background: linear-gradient(135deg, rgba(102, 166, 255, 0.35), rgba(109, 222, 255, 0.25));
+    border-color: rgba(102, 166, 255, 0.6);
+    box-shadow: 0 4px 12px rgba(102, 166, 255, 0.25);
+}
+
+/* 取消按钮 */
+.wbap-opt-action-cancel {
+    background: linear-gradient(135deg, rgba(255, 100, 100, 0.25), rgba(255, 140, 100, 0.15));
+    border-color: rgba(255, 100, 100, 0.4);
+    color: #ffb5b5;
+}
+
+.wbap-opt-action-cancel:hover {
+    background: linear-gradient(135deg, rgba(255, 100, 100, 0.35), rgba(255, 140, 100, 0.25));
+    border-color: rgba(255, 100, 100, 0.6);
+    box-shadow: 0 4px 12px rgba(255, 100, 100, 0.25);
 }
 
 .wbap-opt-select {
@@ -2136,7 +2179,7 @@ html.wbap-overlay-open {
 .wbap-opt-popover {
     position: absolute;
     bottom: 68px;
-    left: 18px;
+    left: 8px;
     width: 480px;
     max-width: 90vw;
     background: linear-gradient(150deg, rgba(54, 67, 117, 0.92), rgba(23, 27, 52, 0.95));
@@ -2232,3 +2275,73 @@ html.wbap-overlay-open {
     border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* ==================== 小尺寸弹窗（API实例/模型选择） ==================== */
+.wbap-opt-popover-sm {
+    width: 280px;
+    max-width: 85vw;
+}
+
+.wbap-opt-pop-body-single {
+    padding: 10px 12px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* 单选项样式 - 用于API实例和模型列表 */
+.wbap-opt-list .wbap-opt-radio-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #e9eefb;
+    transition: all 0.15s ease;
+}
+
+.wbap-opt-list .wbap-opt-radio-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.wbap-opt-list .wbap-opt-radio-item.selected {
+    background: linear-gradient(135deg, rgba(102, 166, 255, 0.2), rgba(109, 222, 255, 0.15));
+    border-color: rgba(102, 166, 255, 0.5);
+    box-shadow: 0 4px 12px rgba(102, 166, 255, 0.2);
+}
+
+.wbap-opt-list .wbap-opt-radio-item.selected::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: linear-gradient(135deg, #66a6ff, #6ddefd);
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px rgba(102, 166, 255, 0.6);
+}
+
+.wbap-opt-list .wbap-opt-radio-item:not(.selected)::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.wbap-opt-radio-item-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wbap-opt-radio-item-sub {
+    font-size: 11px;
+    color: rgba(233, 238, 251, 0.5);
+    margin-top: 2px;
+}
