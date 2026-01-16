@@ -29,7 +29,15 @@
         // API实例和模型选择状态
         selectedEndpointId: null,
         selectedModel: null,
-        availableModels: []
+        availableModels: [],
+        // 取消和重新生成
+        abortController: null,
+        lastUserInput: '',
+        // Level3 三级优化模式
+        mode: 'manual',           // 'manual' | 'level3'
+        level3Context: null,      // 三级优化上下文 { inputText, originalInput, worldbookContent }
+        level3Resolve: null,      // Promise resolve 回调
+        level3Reject: null        // Promise reject 回调
     };
 
     function getConfig() {
@@ -75,6 +83,12 @@
         state.elements.modelPop = root.querySelector('#wbap-opt-model-pop');
         state.elements.modelList = root.querySelector('#wbap-opt-model-list');
         state.elements.modelRefresh = root.querySelector('#wbap-opt-model-refresh');
+        // 操作按钮
+        state.elements.regenBtn = root.querySelector('#wbap-opt-regen');
+        state.elements.cancelBtn = root.querySelector('#wbap-opt-cancel');
+        // Level3 模式按钮
+        state.elements.confirmBtn = root.querySelector('#wbap-opt-confirm');
+        state.elements.skipBtn = root.querySelector('#wbap-opt-skip');
 
         bindPanelEvents();
         resetChat();
@@ -119,6 +133,19 @@
         state.elements.modelBtn?.addEventListener('click', toggleModelPopover);
         root.querySelector('#wbap-opt-model-close')?.addEventListener('click', hideModelPopover);
         modelRefresh?.addEventListener('click', handleRefreshModelList);
+
+        // 操作按钮事件
+        state.elements.regenBtn?.addEventListener('click', handleRegenerate);
+        state.elements.cancelBtn?.addEventListener('click', handleCancel);
+
+        // Level3 模式按钮事件
+        state.elements.confirmBtn?.addEventListener('click', confirmLevel3);
+        state.elements.skipBtn?.addEventListener('click', skipLevel3);
+
+        // 提示词选择按钮
+        root.querySelector('#wbap-opt-prompt-btn')?.addEventListener('click', () => {
+            openLevel3Editor();
+        });
 
         // 点击遮罩关闭预览
         previewOverlay?.addEventListener('click', (e) => {
@@ -589,21 +616,27 @@
     }
 
 
-
-    async function handleSend() {
+    async function handleSend(textOverride = null) {
         if (state.sending) return;
         const input = state.elements.input;
         if (!input) return;
-        const userText = input.value.trim();
+        const userText = textOverride || input.value.trim();
         if (!userText) return;
 
-        appendMessage('user', userText);
-        input.value = '';
-        autoResizeInput();
+        // 保存最后一次输入用于重新生成
+        state.lastUserInput = userText;
+
+        if (!textOverride) {
+            appendMessage('user', userText);
+            input.value = '';
+            autoResizeInput();
+        }
 
         try {
             state.sending = true;
+            state.abortController = new AbortController();
             setSending(true);
+
             const { apiConfig, model } = resolveApiConfig();
             if (!model) throw new Error('请先为优化选择模型');
 
@@ -611,26 +644,62 @@
 
             const systemPrompt = (getConfig().optimizationSystemPrompt || '').trim() || DEFAULT_SYSTEM_PROMPT;
             const prompt = buildOptimizationPrompt(userText, worldbookContent);
-            const result = await WBAP.callAI(model, prompt, systemPrompt, apiConfig);
+
+            // 带取消信号的API调用
+            const result = await WBAP.callAI(model, prompt, systemPrompt, apiConfig, {
+                signal: state.abortController.signal
+            });
             appendMessage('ai', result?.trim() || '（未返回内容）');
         } catch (err) {
-            Logger.error('剧情优化失败', err);
-            appendMessage('ai', `⚠️ 优化失败：${err.message || err}`);
+            if (err.name === 'AbortError' || err.message?.includes('abort')) {
+                appendMessage('ai', '⚠️ 生成已取消');
+            } else {
+                Logger.error('剧情优化失败', err);
+                appendMessage('ai', `⚠️ 优化失败：${err.message || err}`);
+            }
         } finally {
             state.sending = false;
+            state.abortController = null;
             setSending(false);
         }
     }
 
+    function handleRegenerate() {
+        if (state.sending) return;
+        // 找到最后一条用户消息
+        const lastUserMsg = [...state.messages].reverse().find(m => m.role === 'user');
+        if (!lastUserMsg) {
+            alert('没有可重新生成的消息');
+            return;
+        }
+        // 移除最后一条AI回复（如果有）
+        if (state.messages.length > 0 && state.messages[state.messages.length - 1].role === 'ai') {
+            state.messages.pop();
+            renderMessages();
+        }
+        // 使用最后一条用户输入重新生成
+        handleSend(lastUserMsg.content);
+    }
+
+    function handleCancel() {
+        if (!state.sending || !state.abortController) return;
+        state.abortController.abort();
+    }
+
     function setSending(loading) {
-        const btn = state.elements.sendBtn;
-        if (!btn) return;
+        const { sendBtn, cancelBtn, regenBtn } = state.elements;
         if (loading) {
-            btn.classList.add('loading');
-            btn.disabled = true;
+            sendBtn?.classList.add('loading');
+            if (sendBtn) sendBtn.disabled = true;
+            // 显示取消按钮，隐藏重新生成按钮
+            cancelBtn?.classList.remove('wbap-hidden');
+            regenBtn?.classList.add('wbap-hidden');
         } else {
-            btn.classList.remove('loading');
-            btn.disabled = false;
+            sendBtn?.classList.remove('loading');
+            if (sendBtn) sendBtn.disabled = false;
+            // 隐藏取消按钮，显示重新生成按钮
+            cancelBtn?.classList.add('wbap-hidden');
+            regenBtn?.classList.remove('wbap-hidden');
         }
     }
 
@@ -784,6 +853,151 @@
         }
     }
 
+    // ==================== 三级优化模式 ====================
+
+    /**
+     * 三级优化入口 - 被 processing.js 调用
+     * @param {string} inputText - 一级/二级处理后的结果
+     * @param {object} context - 上下文信息
+     * @returns {Promise<string>} - 优化后的结果
+     */
+    async function processLevel3(inputText, context = {}) {
+        const cfg = getConfig();
+        const level3Cfg = cfg.optimizationLevel3 || {};
+
+        // 如果未启用或自动确认模式，直接处理
+        if (level3Cfg.autoConfirm) {
+            return await autoProcessLevel3(inputText, context);
+        }
+
+        // 返回 Promise，等待用户确认
+        return new Promise((resolve, reject) => {
+            state.mode = 'level3';
+            state.level3Context = { inputText, ...context };
+            state.level3Resolve = resolve;
+            state.level3Reject = reject;
+
+            // 重置并打开面板
+            ensurePanelInjected();
+            state.messages = [
+                { role: 'ai', content: '📝 收到处理结果，正在进行三级优化...' }
+            ];
+            renderMessages();
+            openPanelForLevel3();
+
+            // 自动触发优化
+            handleSend(inputText);
+        });
+    }
+
+    /**
+     * 自动处理三级优化（无需用户确认）
+     */
+    async function autoProcessLevel3(inputText, context) {
+        const cfg = getConfig();
+        const level3Cfg = cfg.optimizationLevel3 || {};
+        const { apiConfig, model } = resolveApiConfig();
+
+        if (!model) {
+            Logger.warn('三级优化：未配置模型，跳过优化');
+            return inputText;
+        }
+
+        const systemPrompt = level3Cfg.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+        const promptTemplate = level3Cfg.promptTemplate || '请优化以下剧情内容：\n\n{input}';
+        const prompt = promptTemplate.replace('{input}', inputText).replace('{worldbook}', context.worldbookContent || '');
+
+        try {
+            const result = await WBAP.callAI(model, prompt, systemPrompt, apiConfig);
+            return result?.trim() || inputText;
+        } catch (err) {
+            Logger.error('三级自动优化失败', err);
+            return inputText;
+        }
+    }
+
+    /**
+     * 打开面板用于三级优化
+     */
+    function openPanelForLevel3() {
+        const root = state.elements.root;
+        if (!root) return;
+        root.classList.add('open', 'level3-mode');
+        root.classList.remove('wbap-hidden');
+        renderEndpointList();
+        loadCurrentEndpointModel();
+        scrollChatToBottom();
+        updateLevel3Buttons();
+    }
+
+    /**
+     * 更新 level3 模式特有按钮的显示
+     */
+    function updateLevel3Buttons() {
+        const root = state.elements.root;
+        if (!root) return;
+        const level3Actions = root.querySelector('.wbap-opt-level3-actions');
+        if (state.mode === 'level3') {
+            level3Actions?.classList.remove('wbap-hidden');
+        } else {
+            level3Actions?.classList.add('wbap-hidden');
+        }
+    }
+
+    /**
+     * 确认并发送到 ST
+     */
+    function confirmLevel3() {
+        if (state.mode !== 'level3' || !state.level3Resolve) return;
+
+        // 获取最后一条 AI 回复作为优化结果
+        const lastAi = [...state.messages].reverse().find(m => m.role === 'ai');
+        const result = lastAi?.content || state.level3Context?.inputText || '';
+
+        // 过滤掉以 ⚠️ 开头的错误消息
+        const finalResult = result.startsWith('⚠️') ? (state.level3Context?.inputText || '') : result;
+
+        state.level3Resolve(finalResult);
+        resetLevel3State();
+        closePanel();
+    }
+
+    /**
+     * 跳过优化，使用原始结果
+     */
+    function skipLevel3() {
+        if (state.mode !== 'level3' || !state.level3Resolve) return;
+
+        const originalResult = state.level3Context?.inputText || '';
+        state.level3Resolve(originalResult);
+        resetLevel3State();
+        closePanel();
+    }
+
+    /**
+     * 取消三级优化
+     */
+    function cancelLevel3() {
+        if (state.mode !== 'level3' || !state.level3Reject) return;
+
+        state.level3Reject(new Error('用户取消了三级优化'));
+        resetLevel3State();
+        closePanel();
+    }
+
+    /**
+     * 重置 level3 状态
+     */
+    function resetLevel3State() {
+        state.mode = 'manual';
+        state.level3Context = null;
+        state.level3Resolve = null;
+        state.level3Reject = null;
+        const root = state.elements.root;
+        if (root) root.classList.remove('level3-mode');
+        updateLevel3Buttons();
+    }
+
     function initialize() {
         if (state.initialized) return;
         state.initialized = true;
@@ -801,13 +1015,101 @@
         tryClamp();
     }
 
+    // ==================== 三级优化提示词编辑面板 ====================
+
+    let level3EditorInjected = false;
+
+    function ensureLevel3EditorInjected() {
+        if (level3EditorInjected) return;
+        const tpl = WBAP.UI_TEMPLATES?.LEVEL3_PROMPT_EDITOR_HTML;
+        if (!tpl) return;
+
+        const container = document.createElement('div');
+        container.innerHTML = tpl;
+        document.body.appendChild(container.firstElementChild);
+        level3EditorInjected = true;
+
+        // 绑定事件
+        const editor = document.getElementById('wbap-level3-prompt-editor');
+        if (!editor) return;
+
+        editor.querySelector('#wbap-level3-editor-close')?.addEventListener('click', closeLevel3Editor);
+        editor.querySelector('.wbap-level3-editor-overlay')?.addEventListener('click', closeLevel3Editor);
+        editor.querySelector('#wbap-level3-save')?.addEventListener('click', saveLevel3Prompts);
+        editor.querySelector('#wbap-level3-reset')?.addEventListener('click', resetLevel3Prompts);
+    }
+
+    function openLevel3Editor() {
+        ensureLevel3EditorInjected();
+        const editor = document.getElementById('wbap-level3-prompt-editor');
+        if (!editor) return;
+
+        // 加载当前配置
+        const cfg = getConfig();
+        const level3Cfg = cfg.optimizationLevel3 || {};
+
+        const systemPromptEl = editor.querySelector('#wbap-level3-system-prompt');
+        const templateEl = editor.querySelector('#wbap-level3-prompt-template');
+
+        if (systemPromptEl) {
+            systemPromptEl.value = level3Cfg.systemPrompt || '';
+        }
+        if (templateEl) {
+            templateEl.value = level3Cfg.promptTemplate || '';
+        }
+
+        editor.classList.remove('wbap-hidden');
+    }
+
+    function closeLevel3Editor() {
+        const editor = document.getElementById('wbap-level3-prompt-editor');
+        if (editor) editor.classList.add('wbap-hidden');
+    }
+
+    function saveLevel3Prompts() {
+        const cfg = getConfig();
+        if (!cfg.optimizationLevel3) cfg.optimizationLevel3 = {};
+
+        const systemPromptEl = document.getElementById('wbap-level3-system-prompt');
+        const templateEl = document.getElementById('wbap-level3-prompt-template');
+
+        cfg.optimizationLevel3.systemPrompt = systemPromptEl?.value || '';
+        cfg.optimizationLevel3.promptTemplate = templateEl?.value || '';
+
+        WBAP.saveConfig?.();
+        closeLevel3Editor();
+
+        // 简单提示
+        Logger.log('三级优化提示词已保存');
+    }
+
+    function resetLevel3Prompts() {
+        const systemPromptEl = document.getElementById('wbap-level3-system-prompt');
+        const templateEl = document.getElementById('wbap-level3-prompt-template');
+
+        if (systemPromptEl) {
+            systemPromptEl.value = DEFAULT_SYSTEM_PROMPT;
+        }
+        if (templateEl) {
+            templateEl.value = '请优化以下剧情内容，保持人设和世界观一致：\n\n{input}';
+        }
+    }
+
     // Expose API
     window.WBAP.Optimization = {
         initialize,
         openPanel,
         closePanel,
         updateFloatingButtonVisibility,
-        resetChat
+        resetChat,
+        // 三级优化 API
+        processLevel3,
+        confirmLevel3,
+        skipLevel3,
+        cancelLevel3,
+        // 提示词编辑器 API
+        openLevel3Editor,
+        closeLevel3Editor
     };
 
     if (document.readyState === 'loading') {

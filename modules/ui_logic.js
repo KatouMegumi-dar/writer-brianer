@@ -461,6 +461,39 @@
             config.aggregatorMode.promptIndex = parseInt(e.target.value, 10) || 0;
         });
 
+        // 剧情优化折叠面板逻辑
+        const optimizationCheckbox = document.getElementById('wbap-settings-plot-optimization');
+        const optimizationSection = document.getElementById('wbap-optimization-section');
+        const optimizationContent = document.getElementById('wbap-optimization-content');
+
+        const toggleOptimizationSection = (expanded) => {
+            if (expanded) {
+                optimizationSection?.classList.add('expanded');
+                optimizationContent?.classList.remove('wbap-hidden');
+            } else {
+                optimizationSection?.classList.remove('expanded');
+                optimizationContent?.classList.add('wbap-hidden');
+            }
+        };
+
+        optimizationCheckbox?.addEventListener('change', (e) => {
+            toggleOptimizationSection(e.target.checked);
+        });
+
+        // 三级优化开关
+        document.getElementById('wbap-settings-level3-enabled')?.addEventListener('change', (e) => {
+            const config = WBAP.CharacterManager.getCurrentCharacterConfig();
+            if (!config.optimizationLevel3) config.optimizationLevel3 = { enabled: false, promptTemplate: '', systemPrompt: '', autoConfirm: false };
+            config.optimizationLevel3.enabled = e.target.checked;
+        });
+
+        // 提示词编辑按钮
+        document.getElementById('wbap-opt-edit-prompt')?.addEventListener('click', () => {
+            if (WBAP.Optimization?.openLevel3Editor) {
+                WBAP.Optimization.openLevel3Editor();
+            }
+        });
+
         document.getElementById('wbap-optimization-use-independent')?.addEventListener('change', (e) => {
             toggleOptimizationApiBlocks(e.target.checked === true);
         });
@@ -748,6 +781,34 @@
         const optimizationFabEl = document.getElementById('wbap-settings-plot-optimization-fab');
         if (optimizationFabEl) {
             optimizationFabEl.checked = config.enablePlotOptimizationFloatButton === true;
+        }
+
+        // 三级优化开关
+        const level3EnabledEl = document.getElementById('wbap-settings-level3-enabled');
+        if (level3EnabledEl) {
+            level3EnabledEl.checked = config.optimizationLevel3?.enabled === true;
+        }
+
+        // 根据启用状态展开/折叠设置区域
+        const optimizationSection = document.getElementById('wbap-optimization-section');
+        const optimizationContent = document.getElementById('wbap-optimization-content');
+        if (config.enablePlotOptimization === true) {
+            optimizationSection?.classList.add('expanded');
+            optimizationContent?.classList.remove('wbap-hidden');
+        } else {
+            optimizationSection?.classList.remove('expanded');
+            optimizationContent?.classList.add('wbap-hidden');
+        }
+
+        // 更新提示词预设显示
+        const level3Cfg = config.optimizationLevel3 || {};
+        const promptNameEl = document.getElementById('wbap-opt-prompt-name');
+        const promptDescEl = document.getElementById('wbap-opt-prompt-desc');
+        if (promptNameEl) {
+            promptNameEl.textContent = level3Cfg.systemPrompt?.split('\n')[0]?.slice(0, 30) || '默认优化提示词';
+        }
+        if (promptDescEl) {
+            promptDescEl.textContent = level3Cfg.promptTemplate?.slice(0, 80) || '点击编辑按钮自定义系统提示词和优化模板...';
         }
 
         const optimizationPromptEl = document.getElementById('wbap-settings-optimization-prompt');

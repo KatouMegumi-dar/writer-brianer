@@ -667,6 +667,24 @@
                 Logger.warn('Aggregator enabled but endpoint is missing or disabled.');
             }
 
+            // ==================== 三级剧情优化 ====================
+            const level3Cfg = config?.optimizationLevel3 || {};
+            if (config?.enablePlotOptimization && level3Cfg.enabled && WBAP.Optimization?.processLevel3) {
+                try {
+                    Logger.log('开始三级剧情优化...');
+                    const optimizedContent = await WBAP.Optimization.processLevel3(finalContent, {
+                        originalInput: userInput,
+                        context: context
+                    });
+                    if (optimizedContent && typeof optimizedContent === 'string') {
+                        finalContent = optimizedContent;
+                        Logger.log('三级剧情优化完成');
+                    }
+                } catch (err) {
+                    Logger.warn('三级剧情优化被跳过或取消', err);
+                }
+            }
+
             return buildAnalysisBlock(finalContent);
         } catch (e) {
             Logger.error('Selective mode processing failed', e);

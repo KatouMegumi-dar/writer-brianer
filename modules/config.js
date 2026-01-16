@@ -59,18 +59,24 @@
             showProgressPanel: true,
             enablePlotOptimization: false,
             enablePlotOptimizationFloatButton: false,
-            optimizationSystemPrompt: '', // Empty means use default hardcoded one
+            optimizationSystemPrompt: '',
             aggregatorMode: createDefaultAggregatorConfig(),
-            // 剧情优化面板独立配置 (New)
+            // 剧情优化面板独立配置
             optimizationApiConfig: {
-                useIndependentProfile: false, // 是否使用独立配置，false 则跟随 selectiveMode 的第一个或指定的 endpoint
-                selectedEndpointId: null,     // 如果不使用独立配置，这里记录上次选择的 endpoint ID
-                // 独立配置参数 (当 useIndependentProfile = true 时使用)
+                useIndependentProfile: false,
+                selectedEndpointId: null,
                 apiUrl: '',
                 apiKey: '',
                 model: '',
                 maxTokens: 4000,
                 temperature: 0.7
+            },
+            // 三级剧情优化配置
+            optimizationLevel3: {
+                enabled: false,
+                promptTemplate: '',
+                systemPrompt: '',
+                autoConfirm: false
             }
         };
     }
@@ -82,8 +88,8 @@
                 'default': createDefaultCharacterConfig()
             },
             globalSettings: {
-                maxConcurrent: 0, // 0 = 不限制并发
-                timeout: 0        // 0 = 使用端点自身或默认
+                maxConcurrent: 0,
+                timeout: 0
             }
         };
     }
@@ -96,7 +102,7 @@
         endpoints.forEach(ep => {
             if (!ep.apiUrl && ep.url) ep.apiUrl = ep.url;
             if (!ep.apiKey && ep.key) ep.apiKey = ep.key;
-            if (ep.timeout == null) ep.timeout = 0; // 0 表示使用全局或默认
+            if (ep.timeout == null) ep.timeout = 0;
             if (ep.topP == null) ep.topP = 1;
             if (ep.presencePenalty == null) ep.presencePenalty = 0;
             if (ep.frequencyPenalty == null) ep.frequencyPenalty = 0;
@@ -174,6 +180,16 @@
                 };
                 migrated = true;
             }
+            // 三级优化配置迁移
+            if (!charConfig.optimizationLevel3) {
+                charConfig.optimizationLevel3 = {
+                    enabled: false,
+                    promptTemplate: '',
+                    systemPrompt: '',
+                    autoConfirm: false
+                };
+                migrated = true;
+            }
         }
         return migrated;
     }
@@ -195,15 +211,10 @@
                     mainConfig.globalSettings = createDefaultMainConfig().globalSettings;
                 }
 
-                // v1 -> v2 迁移逻辑
-                // v1 -> v2 迁移逻辑
                 if (migrateConfig(mainConfig)) {
                     Logger.log('配置已从旧版本迁移并保存');
                     saveConfig();
                 }
-
-                // (Optimized: Logic moved to migrateConfig)
-
 
             } else {
                 mainConfig = createDefaultMainConfig();

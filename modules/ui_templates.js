@@ -295,62 +295,90 @@
                     </label>
                     <small class="wbap-text-muted">勾选后，如果输入中已包含其他插件的注入标记，将不再二次处理以避免重复。</small>
                 </div>
-                <div class="wbap-form-group">
                 <label class="wbap-switch-label">
                     <input type="checkbox" id="wbap-settings-progress-panel">
                     <span class="wbap-switch-slider"></span>
                     <span class="wbap-switch-text">显示处理进度面板</span>
                 </label>
-                <label class="wbap-switch-label">
-                    <input type="checkbox" id="wbap-settings-plot-optimization">
-                    <span class="wbap-switch-slider"></span>
-                    <span class="wbap-switch-text">启用剧情优化面板 (处理后手动微调)</span>
-                </label>
-                <label class="wbap-switch-label" style="margin-top: 6px;">
-                    <input type="checkbox" id="wbap-settings-plot-optimization-fab">
-                    <span class="wbap-switch-slider"></span>
-                    <span class="wbap-switch-text">启用剧情优化悬浮球（全局快捷入口）</span>
-                </label>
-                <div class="wbap-form-group" style="margin-top: 10px;">
-                    <label>专属提示词 (Optimization System Prompt)</label>
-                    <textarea id="wbap-settings-optimization-prompt" class="wbap-textarea" rows="3" placeholder="默认提示词... (留空则使用内置优化逻辑)"></textarea>
-                    <small class="wbap-text-muted">此处可定义优化助手的角色设定和行为准则。</small>
-                </div>
-                <div class="wbap-form-group" style="margin-top: 10px;">
+            </div>
+
+            <!-- 剧情优化可折叠区域 -->
+            <div class="wbap-section wbap-collapsible-section" id="wbap-optimization-section">
+                <div class="wbap-collapsible-header">
                     <label class="wbap-switch-label">
-                        <input type="checkbox" id="wbap-optimization-use-independent">
+                        <input type="checkbox" id="wbap-settings-plot-optimization">
                         <span class="wbap-switch-slider"></span>
-                        <span class="wbap-switch-text">剧情优化使用独立 API 配置</span>
+                        <span class="wbap-switch-text">启用剧情优化</span>
                     </label>
+                    <i class="fa-solid fa-chevron-down wbap-collapse-icon"></i>
                 </div>
-                <div class="wbap-form-group" id="wbap-optimization-endpoint-block">
-                    <label>优化面板默认 API 实例</label>
-                    <select id="wbap-optimization-endpoint-select"></select>
-                </div>
-                <div id="wbap-optimization-independent-block" class="wbap-hidden">
-                    <div class="wbap-form-group">
-                        <label>优化面板 API URL</label>
-                        <input type="text" id="wbap-optimization-api-url" placeholder="https://api.example.com/v1">
+                <div class="wbap-collapsible-content wbap-hidden" id="wbap-optimization-content">
+                    <div class="wbap-form-group" style="margin-top: 12px;">
+                        <label class="wbap-switch-label">
+                            <input type="checkbox" id="wbap-settings-plot-optimization-fab">
+                            <span class="wbap-switch-slider"></span>
+                            <span class="wbap-switch-text">启用剧情优化悬浮球（全局快捷入口）</span>
+                        </label>
                     </div>
-                    <div class="wbap-form-group">
-                        <label>优化面板 API Key</label>
-                        <input type="password" id="wbap-optimization-api-key" placeholder="sk-...">
+                    <div class="wbap-form-group" style="margin-top: 12px;">
+                        <label class="wbap-switch-label">
+                            <input type="checkbox" id="wbap-settings-level3-enabled">
+                            <span class="wbap-switch-slider"></span>
+                            <span class="wbap-switch-text">启用三级优化（处理后自动弹出优化面板）</span>
+                        </label>
                     </div>
-                    <div class="wbap-form-group">
-                        <label>优化面板模型</label>
-                        <div class="wbap-input-group">
-                            <select id="wbap-optimization-model"></select>
-                            <button id="wbap-optimization-fetch-models" class="wbap-btn wbap-btn-secondary">获取模型</button>
+                    
+                    <!-- 提示词预设选择区域（参考首页样式） -->
+                    <div class="wbap-form-group wbap-opt-prompt-section" style="margin-top: 16px;">
+                        <div class="wbap-opt-prompt-header">
+                            <label>剧情优化提示词预设</label>
+                            <button type="button" id="wbap-opt-edit-prompt" class="wbap-btn wbap-btn-xs wbap-btn-secondary">
+                                <i class="fa-solid fa-pencil"></i> 编辑
+                            </button>
+                        </div>
+                        <div class="wbap-opt-prompt-preview" id="wbap-opt-prompt-preview">
+                            <div class="wbap-opt-prompt-name" id="wbap-opt-prompt-name">默认优化提示词</div>
+                            <div class="wbap-opt-prompt-desc" id="wbap-opt-prompt-desc">点击编辑按钮自定义系统提示词和优化模板...</div>
                         </div>
                     </div>
-                    <div class="wbap-form-row">
+                    
+                    <!-- API配置 -->
+                    <div class="wbap-form-group" style="margin-top: 16px;">
+                        <label class="wbap-switch-label">
+                            <input type="checkbox" id="wbap-optimization-use-independent">
+                            <span class="wbap-switch-slider"></span>
+                            <span class="wbap-switch-text">使用独立 API 配置</span>
+                        </label>
+                    </div>
+                    <div class="wbap-form-group" id="wbap-optimization-endpoint-block">
+                        <label>优化面板默认 API 实例</label>
+                        <select id="wbap-optimization-endpoint-select"></select>
+                    </div>
+                    <div id="wbap-optimization-independent-block" class="wbap-hidden">
                         <div class="wbap-form-group">
-                            <label>Max Tokens</label>
-                            <input type="number" id="wbap-optimization-max-tokens" min="0" value="4000">
+                            <label>优化面板 API URL</label>
+                            <input type="text" id="wbap-optimization-api-url" placeholder="https://api.example.com/v1">
                         </div>
                         <div class="wbap-form-group">
-                            <label>Temperature</label>
-                            <input type="number" id="wbap-optimization-temperature" min="0" max="2" step="0.1" value="0.7">
+                            <label>优化面板 API Key</label>
+                            <input type="password" id="wbap-optimization-api-key" placeholder="sk-...">
+                        </div>
+                        <div class="wbap-form-group">
+                            <label>优化面板模型</label>
+                            <div class="wbap-input-group">
+                                <select id="wbap-optimization-model"></select>
+                                <button id="wbap-optimization-fetch-models" class="wbap-btn wbap-btn-secondary">获取模型</button>
+                            </div>
+                        </div>
+                        <div class="wbap-form-row">
+                            <div class="wbap-form-group">
+                                <label>Max Tokens</label>
+                                <input type="number" id="wbap-optimization-max-tokens" min="0" value="4000">
+                            </div>
+                            <div class="wbap-form-group">
+                                <label>Temperature</label>
+                                <input type="number" id="wbap-optimization-temperature" min="0" max="2" step="0.1" value="0.7">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -599,6 +627,11 @@
                         <button id="wbap-opt-world-apply" class="wbap-opt-mini-btn wbap-opt-mini-primary" type="button">完成</button>
                     </div>
                 </div>
+                <!-- 选择提示词按钮 -->
+                <button class="wbap-opt-chip wbap-opt-chip-btn" id="wbap-opt-prompt-btn" type="button">
+                    <i class="fa-solid fa-file-lines"></i>
+                    <span id="wbap-opt-prompt-label">提示词</span>
+                </button>
                 <!-- API 实例选择按钮 + 弹窗 -->
                 <button class="wbap-opt-chip wbap-opt-chip-btn" id="wbap-opt-endpoint-btn" type="button">
                     <i class="fa-solid fa-server"></i>
@@ -650,6 +683,52 @@
                     <i class="fa-solid fa-paper-plane"></i>
                 </button>
             </div>
+            <!-- Level3 模式操作栏 -->
+            <div class="wbap-opt-level3-actions wbap-hidden">
+                <button class="wbap-opt-level3-btn wbap-opt-level3-skip" id="wbap-opt-skip" type="button">
+                    <i class="fa-solid fa-forward"></i>
+                    <span>跳过优化</span>
+                </button>
+                <button class="wbap-opt-level3-btn wbap-opt-level3-confirm" id="wbap-opt-confirm" type="button">
+                    <i class="fa-solid fa-check"></i>
+                    <span>确认并发送到ST</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+`;
+    // 三级优化提示词编辑面板
+    const LEVEL3_PROMPT_EDITOR_HTML = `
+<div id="wbap-level3-prompt-editor" class="wbap-level3-editor wbap-hidden">
+    <div class="wbap-level3-editor-overlay"></div>
+    <div class="wbap-level3-editor-container">
+        <div class="wbap-level3-editor-header">
+            <span class="wbap-level3-editor-title">三级优化提示词编辑</span>
+            <button id="wbap-level3-editor-close" class="wbap-opt-icon-btn" type="button">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="wbap-level3-editor-body">
+            <div class="wbap-level3-field">
+                <label for="wbap-level3-system-prompt">系统提示词</label>
+                <textarea id="wbap-level3-system-prompt" class="wbap-level3-textarea" rows="6" placeholder="定义AI的角色和行为规则..."></textarea>
+            </div>
+            <div class="wbap-level3-field">
+                <label for="wbap-level3-prompt-template">优化提示词模板</label>
+                <textarea id="wbap-level3-prompt-template" class="wbap-level3-textarea" rows="8" placeholder="使用 {input} 代表待优化内容，{worldbook} 代表世界书摘录..."></textarea>
+                <div class="wbap-level3-hint">
+                    可用变量：<code>{input}</code> - 待优化内容，<code>{worldbook}</code> - 世界书摘录
+                </div>
+            </div>
+        </div>
+        <div class="wbap-level3-editor-footer">
+            <button id="wbap-level3-reset" class="wbap-level3-btn-secondary" type="button">
+                <i class="fa-solid fa-rotate-left"></i> 恢复默认
+            </button>
+            <button id="wbap-level3-save" class="wbap-level3-btn-primary" type="button">
+                <i class="fa-solid fa-save"></i> 保存
+            </button>
         </div>
     </div>
 </div>
@@ -663,7 +742,8 @@
         API_ENDPOINT_EDITOR_HTML,
         PROMPT_PICKER_HTML,
         PROGRESS_PANEL_HTML,
-        OPTIMIZATION_PANEL_HTML
+        OPTIMIZATION_PANEL_HTML,
+        LEVEL3_PROMPT_EDITOR_HTML
     };
 
 })();
