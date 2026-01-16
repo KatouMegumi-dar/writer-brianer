@@ -1,0 +1,2442 @@
+﻿@charset "UTF-8";
+/*
+ * 笔者之脑 - UI 样式 v3.0
+ * 设计思路:
+ * 1. 移动端优先 (Mobile-First)
+ * 2. 玻璃拟态 (Glassmorphism) 风格
+ * 3. 清晰的显示/隐藏逻辑
+ */
+
+/* ============================================================================
+   [1] CSS 变量
+   ============================================================================ */
+:root {
+    /* 主色调 */
+    --wbap-primary: hsl(231, 70%, 65%);
+    --wbap-primary-light: hsl(231, 70%, 75%);
+    --wbap-primary-dark: hsl(231, 60%, 55%);
+    --wbap-accent: hsl(265, 75%, 70%);
+
+    /* 状态色 */
+    --wbap-success: #34d399;
+    --wbap-warning: #fbbf24;
+    --wbap-danger: #f87171;
+    --wbap-danger-dark: #ef4444;
+
+    /* 背景 */
+    --wbap-bg-base: hsl(220, 20%, 10%);
+    --wbap-bg-panel: hsla(220, 20%, 15%, 0.85);
+    --wbap-bg-element: hsla(220, 20%, 20%, 0.8);
+    --wbap-bg-element-hover: hsla(220, 20%, 25%, 0.9);
+    --wbap-bg-input: hsl(220, 20%, 12%);
+    --wbap-bg-secondary: hsl(220, 20%, 18%);
+
+    /* 文本 */
+    --wbap-text: #f1f5f9;
+    --wbap-text-secondary: #94a3b8;
+    --wbap-text-muted: #64748b;
+    --wbap-text-on-primary: #ffffff;
+
+    /* 边框 */
+    --wbap-border-color: hsla(220, 20%, 30%, 0.4);
+    --wbap-border-color-light: hsla(220, 20%, 40%, 0.6);
+    --wbap-border-radius-sm: 6px;
+    --wbap-border-radius-md: 12px;
+    --wbap-border-radius-lg: 16px;
+
+    /* 阴影 */
+    --wbap-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --wbap-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --wbap-shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.4);
+
+    /* 过渡 */
+    --wbap-transition-fast: 0.15s ease-out;
+    --wbap-transition-normal: 0.25s ease-in-out;
+
+    /* 字体 */
+    --wbap-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    --wbap-font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+/* ============================================================================
+   [2] 基础样式
+   ============================================================================ */
+.wbap-hidden {
+    display: none !important;
+}
+
+/* 防止页面滚动 */
+body.wbap-overlay-open,
+html.wbap-overlay-open {
+    overflow: hidden !important;
+}
+
+/* ============================================================================
+   [3] 悬浮按钮
+   ============================================================================ */
+.wbap-fab {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--wbap-primary), var(--wbap-accent));
+    border: none;
+    color: var(--wbap-text-on-primary);
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: var(--wbap-shadow-lg);
+    z-index: 2147483600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--wbap-transition-fast), box-shadow var(--wbap-transition-fast);
+    touch-action: none;
+}
+
+.wbap-fab:hover {
+    transform: scale(1.1);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5);
+}
+
+.wbap-fab:active {
+    transform: scale(0.95);
+}
+
+/* ============================================================================
+   [4] 遮罩层 - 所有面板和模态框的基础
+   ============================================================================ */
+.wbap-panel,
+.wbap-settings,
+.wbap-modal,
+#wbap-entry-modal,
+#wbap-prompt-editor-modal,
+#wbap-endpoint-editor-modal,
+#wbap-prompt-picker-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2147483640;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+
+    /* 默认隐藏 */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+
+    /* 布局 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+
+    transition: opacity var(--wbap-transition-normal), visibility var(--wbap-transition-normal);
+}
+
+/* 打开状态 */
+.wbap-panel.open,
+.wbap-settings.open,
+.wbap-modal.open,
+#wbap-entry-modal.open,
+#wbap-prompt-editor-modal.open,
+#wbap-endpoint-editor-modal.open,
+#wbap-prompt-picker-modal.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+/* ============================================================================
+   [5] 面板容器 - 内容区域
+   ============================================================================ */
+.wbap-panel-container,
+.wbap-settings-container,
+.wbap-modal-content {
+    background-color: var(--wbap-bg-panel);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-lg);
+    box-shadow: var(--wbap-shadow-lg);
+    max-height: 90vh;
+    max-width: 700px;
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 面板头部 */
+.wbap-panel-header,
+.wbap-settings-header,
+.wbap-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--wbap-border-color);
+    flex-shrink: 0;
+}
+
+.wbap-panel-header h3,
+.wbap-settings-header h3,
+.wbap-modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--wbap-text);
+}
+
+/* 面板内容区 */
+.wbap-panel-content,
+.wbap-settings-content,
+.wbap-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+}
+
+/* 面板底部 */
+.wbap-settings-footer,
+.wbap-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--wbap-border-color);
+    background-color: var(--wbap-bg-element);
+    flex-shrink: 0;
+}
+
+/* ============================================================================
+   [6] 按钮样式
+   ============================================================================ */
+.wbap-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 18px;
+    font-family: var(--wbap-font-sans);
+    font-weight: 500;
+    font-size: 14px;
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-md);
+    background-color: var(--wbap-bg-element);
+    color: var(--wbap-text-secondary);
+    cursor: pointer;
+    transition: all var(--wbap-transition-fast);
+}
+
+.wbap-btn:hover:not(:disabled) {
+    background-color: var(--wbap-bg-element-hover);
+    border-color: var(--wbap-border-color-light);
+    color: var(--wbap-text);
+}
+
+.wbap-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 主按钮 */
+.wbap-btn-primary {
+    background: linear-gradient(135deg, var(--wbap-primary), var(--wbap-accent));
+    border-color: transparent;
+    color: var(--wbap-text-on-primary);
+    box-shadow: 0 4px 15px rgba(100, 100, 200, 0.3);
+}
+
+.wbap-btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(100, 100, 200, 0.4);
+}
+
+/* 危险按钮 */
+.wbap-btn-danger {
+    background-color: var(--wbap-danger);
+    border-color: var(--wbap-danger-dark);
+    color: var(--wbap-text-on-primary);
+}
+
+.wbap-btn-danger:hover:not(:disabled) {
+    background-color: var(--wbap-danger-dark);
+}
+
+/* 图标按钮 */
+.wbap-btn-icon {
+    padding: 8px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+}
+
+/* 小按钮 */
+.wbap-btn-xs {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+/* ============================================================================
+   [7] 表单元素
+   ============================================================================ */
+.wbap-form-group {
+    margin-bottom: 16px;
+}
+
+.wbap-form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--wbap-text);
+}
+
+.wbap-form-group input[type="text"],
+.wbap-form-group input[type="password"],
+.wbap-form-group input[type="number"],
+.wbap-form-group select,
+.wbap-form-group textarea {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: var(--wbap-font-sans);
+    background-color: var(--wbap-bg-input);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-sm);
+    color: var(--wbap-text);
+    transition: border-color var(--wbap-transition-fast), box-shadow var(--wbap-transition-fast);
+    box-sizing: border-box;
+}
+
+.wbap-form-group input:focus,
+.wbap-form-group select:focus,
+.wbap-form-group textarea:focus {
+    outline: none;
+    border-color: var(--wbap-primary);
+    box-shadow: 0 0 0 3px rgba(100, 100, 200, 0.2);
+}
+
+.wbap-form-group textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* 复选框样式 */
+.wbap-form-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--wbap-primary);
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+/* ============================================================================
+   [8] 区块样式
+   ============================================================================ */
+.wbap-section {
+    background-color: var(--wbap-bg-element);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-md);
+    padding: 16px;
+    margin-bottom: 0;
+}
+
+.wbap-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.wbap-section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--wbap-text);
+}
+
+/* ============================================================================
+   [9] 下拉选择框
+   ============================================================================ */
+.wbap-preset-select {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    background-color: var(--wbap-bg-input);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-sm);
+    color: var(--wbap-text);
+    cursor: pointer;
+}
+
+/* ============================================================================
+   [10] 提示词工具栏
+   ============================================================================ */
+.wbap-prompt-actions-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.wbap-prompt-description {
+    font-size: 13px;
+    color: var(--wbap-text-muted);
+    padding: 8px 0;
+    line-height: 1.5;
+}
+
+/* ============================================================================
+   [11] 变量区域
+   ============================================================================ */
+.wbap-variables-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-top: 16px;
+    padding: 16px;
+    background: linear-gradient(135deg, hsla(220, 20%, 18%, 0.6), hsla(220, 20%, 22%, 0.4));
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-md);
+    box-sizing: border-box;
+    width: 100%;
+    overflow: hidden;
+}
+
+.wbap-variable-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    /* 防止 grid 子元素溢出 */
+}
+
+.wbap-variable-item label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--wbap-primary-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.wbap-variable-item input {
+    padding: 12px 14px;
+    font-size: 14px;
+    background: linear-gradient(135deg, var(--wbap-bg-input), hsla(220, 20%, 15%, 0.9));
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-sm);
+    color: var(--wbap-text);
+    transition: all var(--wbap-transition-fast);
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.wbap-variable-item input:focus {
+    outline: none;
+    border-color: var(--wbap-primary);
+    box-shadow: 0 0 0 3px rgba(100, 100, 200, 0.2), inset 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.wbap-variable-item input::placeholder {
+    color: var(--wbap-text-muted);
+    font-style: italic;
+}
+
+/* ============================================================================
+   [12] 状态面板
+   ============================================================================ */
+.wbap-status-panel {
+    padding: 12px;
+    background-color: var(--wbap-bg-secondary);
+    border-radius: var(--wbap-border-radius-sm);
+}
+
+.wbap-status-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.wbap-status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--wbap-success);
+}
+
+.wbap-status-indicator.processing {
+    background-color: var(--wbap-warning);
+    animation: pulse 1s infinite;
+}
+
+.wbap-status-indicator.error {
+    background-color: var(--wbap-danger);
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.wbap-status-text {
+    font-size: 14px;
+    color: var(--wbap-text);
+}
+
+/* ============================================================================
+   [13] API 端点列表
+   ============================================================================ */
+.wbap-api-endpoint-item {
+    background-color: var(--wbap-bg-input);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-md);
+    padding: 12px;
+    margin-bottom: 10px;
+    transition: border-color var(--wbap-transition-fast);
+}
+
+.wbap-api-endpoint-item:hover {
+    border-color: var(--wbap-border-color-light);
+}
+
+.wbap-api-endpoint-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.wbap-api-endpoint-header label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: var(--wbap-text);
+    font-size: 14px;
+}
+
+/* ============================================================================
+   [15] 占位符按钮
+   ============================================================================ */
+.wbap-placeholder-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    font-family: var(--wbap-font-mono);
+    background-color: var(--wbap-bg-secondary);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: 4px;
+    color: var(--wbap-primary-light);
+    cursor: pointer;
+    transition: all var(--wbap-transition-fast);
+}
+
+.wbap-placeholder-btn:hover {
+    background-color: var(--wbap-primary);
+    color: var(--wbap-text-on-primary);
+}
+
+/* ============================================================================
+   [16] 文本样式
+   ============================================================================ */
+.wbap-text-muted {
+    color: var(--wbap-text-muted);
+    font-size: 12px;
+}
+
+/* ============================================================================
+   [17] 空状态
+   ============================================================================ */
+.wbap-empty-state {
+    text-align: center;
+    padding: 24px;
+    color: var(--wbap-text-muted);
+}
+
+.wbap-empty-state p {
+    margin: 0;
+}
+
+/* ============================================================================
+   [18] 滑块样式
+   ============================================================================ */
+.wbap-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.wbap-slider-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--wbap-primary);
+}
+
+.wbap-slider-row span {
+    min-width: 24px;
+    text-align: center;
+    font-weight: 600;
+    color: var(--wbap-text);
+}
+
+/* ============================================================================
+   [19] 标签样式
+   ============================================================================ */
+.wbap-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    font-size: 12px;
+    background-color: var(--wbap-bg-secondary);
+    border-radius: 12px;
+    color: var(--wbap-text-secondary);
+}
+
+/* ============================================================================
+   [20] 滚动条样式
+   ============================================================================ */
+.wbap-panel-content::-webkit-scrollbar,
+.wbap-settings-content::-webkit-scrollbar,
+.wbap-modal-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.wbap-panel-content::-webkit-scrollbar-track,
+.wbap-settings-content::-webkit-scrollbar-track,
+.wbap-modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.wbap-panel-content::-webkit-scrollbar-thumb,
+.wbap-settings-content::-webkit-scrollbar-thumb,
+.wbap-modal-body::-webkit-scrollbar-thumb {
+    background-color: var(--wbap-border-color);
+    border-radius: 3px;
+}
+
+/* ============================================================================
+   [21] 提示词编辑器
+   ============================================================================ */
+#wbap-prompt-editor-modal .wbap-modal-content {
+    max-width: 900px;
+}
+
+/* ============================================================================
+   [22] API 端点编辑器
+   ============================================================================ */
+#wbap-endpoint-editor-modal .wbap-modal-content {
+    max-width: 800px;
+}
+
+/* ============================================================================
+   [23] 提示词选择器
+   ============================================================================ */
+.wbap-prompt-picker-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-sm);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color var(--wbap-transition-fast);
+}
+
+.wbap-prompt-picker-item:hover {
+    border-color: var(--wbap-primary);
+}
+
+.wbap-prompt-picker-item input[type="radio"] {
+    margin-top: 4px;
+    accent-color: var(--wbap-primary);
+}
+
+.wbap-prompt-picker-text .title {
+    font-weight: 600;
+    color: var(--wbap-text);
+    margin-bottom: 4px;
+}
+
+.wbap-prompt-picker-text .desc {
+    font-size: 12px;
+    color: var(--wbap-text-muted);
+}
+
+/* ============================================================================
+   [24] 世界书条目列表
+   ============================================================================ */
+.wbap-book-list-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.wbap-book-item {
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--wbap-text-secondary);
+    border-bottom: 1px solid var(--wbap-border-color);
+    cursor: pointer;
+    transition: all var(--wbap-transition-fast);
+}
+
+.wbap-book-item:hover {
+    background-color: var(--wbap-bg-element-hover);
+    color: var(--wbap-text);
+}
+
+.wbap-book-item.active {
+    background-color: var(--wbap-primary);
+    color: var(--wbap-text-on-primary);
+}
+
+.wbap-entry-item {
+    display: block;
+    padding: 6px 4px;
+    border-radius: var(--wbap-border-radius-sm);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--wbap-text-secondary);
+}
+
+.wbap-entry-item:hover {
+    background-color: var(--wbap-bg-element-hover);
+    color: var(--wbap-text);
+}
+
+.wbap-entry-item input {
+    margin-right: 8px;
+    accent-color: var(--wbap-primary);
+}
+
+/* ============================================================================
+   [25] 桌面端样式 (min-width: 768px)
+   ============================================================================ */
+@media (min-width: 768px) {
+
+    /* 面板容器更大 */
+    .wbap-panel-container {
+        max-width: 700px;
+    }
+
+    /* API 端点编辑器双列布局 */
+    #wbap-endpoint-editor-modal .wbap-modal-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+}
+
+/* ============================================================================
+   [26] 大屏幕样式 (min-width: 1200px)
+   ============================================================================ */
+@media (min-width: 1200px) {
+    .wbap-panel-container {
+        max-width: 1000px;
+    }
+
+    .wbap-settings-container {
+        max-width: 1000px;
+    }
+}
+
+/* ============================================================================
+   [27] 移动端专用样式 (max-width: 767px)
+   ============================================================================ */
+@media (max-width: 767px) {
+
+    .wbap-panel,
+    .wbap-settings,
+    .wbap-modal,
+    #wbap-entry-modal,
+    #wbap-prompt-editor-modal,
+    #wbap-endpoint-editor-modal,
+    #wbap-prompt-picker-modal {
+        align-items: stretch;
+        justify-content: flex-start;
+        padding: 0;
+    }
+
+
+    .wbap-panel-container,
+    .wbap-settings-container,
+    .wbap-modal-content {
+        width: 100vw;
+        max-width: 100vw;
+        height: 100vh;
+        /* Fallback */
+        height: 100dvh;
+        /* Mobile viewport fix */
+        max-height: 100dvh;
+        border-radius: 0;
+        margin: 0;
+    }
+
+    .wbap-settings-footer,
+    .wbap-modal-footer {
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+
+    .wbap-settings-header,
+    .wbap-modal-header {
+        padding: 12px;
+    }
+
+    .wbap-panel-content,
+    .wbap-settings-content,
+    .wbap-modal-body {
+        padding: 12px;
+        /* [Mobile Fix] Increase bottom padding to ensure scrollable content (like save buttons) isn't cut off */
+        padding-bottom: calc(80px + env(safe-area-inset-bottom));
+        gap: 12px;
+        min-height: 0;
+    }
+
+    .wbap-section {
+        padding: 12px;
+    }
+
+    .wbap-form-group {
+        margin-bottom: 12px;
+    }
+
+    .wbap-form-group label {
+        font-size: 13px;
+    }
+
+    .wbap-form-group input[type="text"],
+    .wbap-form-group input[type="password"],
+    .wbap-form-group input[type="number"],
+    .wbap-form-group select,
+    .wbap-form-group textarea {
+        font-size: 13px;
+        padding: 8px 10px;
+    }
+
+    .wbap-btn {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+
+    .wbap-btn-xs {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+
+    .wbap-variables-container {
+        grid-template-columns: 1fr;
+        padding: 12px;
+        gap: 12px;
+    }
+
+    .wbap-prompt-actions-toolbar {
+        gap: 6px;
+    }
+
+    .wbap-slider-row {
+        gap: 8px;
+    }
+
+    .wbap-fab {
+        width: 50px;
+        height: 50px;
+        bottom: 14px;
+        right: 14px;
+        font-size: 22px;
+    }
+
+    /* API 端点编辑器在手机上改为上下堆叠 */
+    #wbap-endpoint-editor-modal .wbap-modal-body {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    /* 世界书条目列表在手机上占满宽度 */
+    #wbap-worldbook-list-column {
+        width: 100% !important;
+        max-height: 180px;
+    }
+
+    #wbap-entry-list-column {
+        max-height: 320px;
+    }
+}
+
+/* ============================================================================
+   [28] PC 端质感增强 (Desktop Only)
+   ============================================================================ */
+@media (min-width: 768px) {
+
+    /* 面板容器 - 增加玻璃质感和深度 */
+    .wbap-panel-container,
+    .wbap-settings-container,
+    .wbap-modal-content {
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+        backdrop-filter: blur(12px) saturate(180%);
+        -webkit-backdrop-filter: blur(12px) saturate(180%);
+        background-color: hsla(220, 20%, 15%, 0.85);
+    }
+
+    /* 按钮 - 增加立体感 */
+    .wbap-btn {
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .wbap-btn:after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .wbap-btn:hover:after {
+        opacity: 1;
+    }
+
+    .wbap-btn:active {
+        transform: translateY(1px);
+    }
+
+    /* 滚动条美化 */
+    *::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    *::-webkit-scrollbar-thumb {
+        background-color: var(--wbap-border-color);
+        border-radius: 4px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+        background-color: var(--wbap-text-muted);
+    }
+}
+
+/* ============================================================================
+   [28] 进度球
+   ============================================================================ */
+/* ============================================================================
+   [30] 全局工具类 (Highest Priority)
+   ============================================================================ */
+.wbap-hidden {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+
+/* ============================================================================
+   [29] 动画
+   ============================================================================ */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* ============================================================================
+   移动端进度面板优化
+   ============================================================================ */
+/* [Removed redundant media query block] */
+
+
+/* ============================================================================
+   [30] 安全区域适配
+   ============================================================================ */
+@supports (padding: env(safe-area-inset-bottom)) {
+    .wbap-fab {
+        bottom: calc(20px + env(safe-area-inset-bottom));
+        right: calc(20px + env(safe-area-inset-right));
+    }
+}
+
+/* ============================================================================
+   [31] 进度条面板 (Progress Panel)
+   ============================================================================ */
+.wbap-progress-panel {
+    position: fixed;
+    top: 15vh;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    z-index: 2147483645;
+    /* Above other panels */
+    background-color: var(--wbap-bg-panel);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-lg);
+    box-shadow: var(--wbap-shadow-lg);
+    width: 90%;
+    max-width: 400px;
+    height: fit-content;
+    max-height: 80vh;
+    padding: 24px;
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+
+    /* Allow resizing down to ~1/3 of default size */
+    min-width: 130px;
+    min-height: 80px;
+    overflow: hidden;
+    /* Prevent content overflow at small sizes */
+
+    /* Initially hidden */
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.wbap-resize-handle {
+    width: 20px;
+    height: 20px;
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    cursor: nwse-resize;
+    z-index: 10;
+    /* Visual indicator (corner triangle) */
+    background: linear-gradient(135deg, transparent 50%, var(--wbap-border-color-light) 50%);
+    border-bottom-right-radius: var(--wbap-border-radius-lg);
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    touch-action: none;
+    /* Prevent scroll on mobile */
+}
+
+.wbap-resize-handle:hover,
+.wbap-resize-handle:active {
+    opacity: 1;
+    background: linear-gradient(135deg, transparent 50%, var(--wbap-primary) 50%);
+}
+
+.wbap-progress-panel.open {
+    display: block;
+    opacity: 1;
+    animation: fadeIn 0.3s forwards;
+}
+
+.wbap-progress-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    border: none;
+    color: var(--wbap-text-muted);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    z-index: 20;
+    transition: all 0.2s;
+}
+
+.wbap-progress-close:hover {
+    color: var(--wbap-text);
+    background-color: var(--wbap-bg-element-hover);
+    transform: rotate(90deg);
+}
+
+.wbap-progress-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+}
+
+.wbap-progress-content h4 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--wbap-text);
+    font-weight: 600;
+}
+
+.wbap-progress-bar-container {
+    width: 100%;
+    height: 8px;
+    background-color: var(--wbap-bg-input);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid var(--wbap-border-color-light);
+}
+
+.wbap-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--wbap-primary), var(--wbap-accent));
+    border-radius: 4px;
+    transition: width 0.3s ease-out;
+    box-shadow: 0 0 10px rgba(100, 100, 255, 0.5);
+}
+
+/* 进度条动画效果 */
+.wbap-progress-bar.animated {
+    background-size: 200% 100%;
+    animation: gradientMove 1.5s linear infinite;
+}
+
+@keyframes gradientMove {
+    0% {
+        background-position: 100% 0;
+    }
+
+    100% {
+        background-position: -100% 0;
+    }
+}
+
+.wbap-progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: var(--wbap-text-secondary);
+}
+
+#wbap-progress-timer {
+    font-family: var(--wbap-font-mono);
+    color: var(--wbap-primary-light);
+    font-weight: bold;
+}
+
+/* Mobile Optimization for Plot Panel */
+@media (max-width: 768px) {
+    #wbap-optimization-panel .wbap-panel-container {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        border-radius: 0 !important;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .wbap-opt-main-view {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .wbap-opt-preview-overlay {
+        width: 100%;
+        height: 100%;
+        left: 0;
+        top: 0;
+        z-index: 2050;
+        /* Above everything */
+    }
+
+    .wbap-opt-chat-list {
+        padding: 10px;
+    }
+
+    .wbap-opt-input-area {
+        padding: 8px;
+        background: var(--wbap-bg-panel);
+        /* Ensure contrast */
+    }
+
+    .wbap-chat-bubble {
+        max-width: 88%;
+    }
+
+    /* Popover adjusts */
+    #wbap-opt-wb-popover {
+        position: fixed;
+        bottom: 60px;
+        /* Above input bar */
+        left: 10px;
+        width: calc(100% - 20px);
+        max-height: 40vh;
+        z-index: 3000;
+    }
+}
+
+
+/* --- Optimization Panel UI Upgrade & Bug Fixes --- */
+
+/* Ensure Panel is Topmost */
+#wbap-optimization-panel {
+    z-index: 2000 !important;
+}
+
+/* Fix Popover Visibility & Z-Index */
+#wbap-opt-wb-popover {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    bottom: 60px;
+    left: 10px;
+    width: 250px;
+    max-height: 300px;
+    background: var(--wbap-bg-panel);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    z-index: 2100 !important;
+    /* Ensure above everything in panel */
+}
+
+#wbap-opt-wb-popover.hidden {
+    display: none !important;
+}
+
+/* Input Area Upgrade */
+.wbap-opt-input-area {
+    background: var(--wbap-bg-element);
+    /* Distinct background */
+    border-top: 1px solid var(--wbap-border-color);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.wbap-opt-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 4px;
+}
+
+.wbap-opt-input-wrapper {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: var(--wbap-bg-input);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: 20px;
+    /* Modern pill shape */
+    padding: 6px 12px;
+}
+
+#wbap-opt-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--wbap-text);
+    min-height: 24px;
+    max-height: 100px;
+    padding: 4px 0;
+    resize: none;
+    /* Auto-growth handled by JS if added, otherwise scroll */
+}
+
+/* Chat Bubble Polish */
+.wbap-chat-bubble {
+    margin-bottom: 12px;
+    max-width: 85%;
+    line-height: 1.5;
+    font-size: 14px;
+    position: relative;
+    word-wrap: break-word;
+}
+
+.wbap-chat-bubble.ai {
+    align-self: flex-start;
+}
+
+.wbap-chat-bubble.user {
+    align-self: flex-end;
+}
+
+.wbap-chat-content {
+    background: var(--wbap-bg-element-hover);
+    padding: 10px 14px;
+    border-radius: 12px;
+    border-top-left-radius: 2px;
+    /* AI style */
+}
+
+.wbap-chat-bubble.user .wbap-chat-content {
+    background: var(--wbap-primary);
+    color: #fff;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 2px;
+    /* User style */
+}
+
+/* Endpoint Selector */
+#wbap-opt-endpoint-select {
+    background: var(--wbap-bg-input);
+    color: var(--wbap-text);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: 4px;
+    outline: none;
+}
+
+
+/* Preview Overlay Base Styles */
+.wbap-opt-preview-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--wbap-bg-panel);
+    z-index: 2050;
+    display: none;
+    /* Hidden by default */
+    flex-direction: column;
+}
+
+/* Toggle Visibility */
+.wbap-opt-preview-overlay.visible {
+    display: flex !important;
+}
+
+.wbap-opt-preview-body {
+    flex: 1;
+    padding: 10px;
+    overflow: hidden;
+    display: flex;
+}
+
+.wbap-opt-textarea {
+    width: 100%;
+    height: 100%;
+    resize: none;
+    background: var(--wbap-bg-input);
+    color: var(--wbap-text);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: 4px;
+    padding: 10px;
+    font-family: inherit;
+    line-height: 1.6;
+}
+
+.wbap-opt-footer {
+    padding: 10px;
+    border-top: 1px solid var(--wbap-border-color);
+}
+
+
+/* --- Optimization Panel UI Refinements (Round 2) --- */
+
+/* 1. Chat Bubble Constraints */
+.wbap-chat-content {
+    max-height: 480px;
+    /* Limit height */
+    overflow-y: auto;
+    /* Allow scrolling */
+    scrollbar-width: thin;
+    /* Firefox */
+}
+
+/* Webkit Scrollbar for bubbles */
+.wbap-chat-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.wbap-chat-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.wbap-chat-bubble.user .wbap-chat-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+
+
+/* 3. Stop Button Styling */
+.wbap-btn-danger {
+    background-color: var(--wbap-danger, #dc3545);
+    color: white;
+}
+
+.wbap-btn-danger:hover {
+    background-color: #c82333;
+}
+
+/* 4. Ensure Preview Overlay is totally opaque and on top */
+
+
+
+/* Enhanced Progress Bar Styles */
+.wbap-progress-bar-container {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    height: 14px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+    margin: 8px 0;
+}
+
+#wbap-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--wbap-primary, #007bff) 0%, #00c6ff 100%);
+    width: 0%;
+    transition: width 0.3s ease-out;
+    position: relative;
+    box-shadow: 0 0 8px rgba(0, 123, 255, 0.5);
+}
+
+#wbap-progress-bar.animated {
+    background-size: 30px 30px;
+    background-image: linear-gradient(45deg,
+            rgba(255, 255, 255, 0.15) 25%,
+            transparent 25%,
+            transparent 50%,
+            rgba(255, 255, 255, 0.15) 50%,
+            rgba(255, 255, 255, 0.15) 75%,
+            transparent 75%,
+            transparent);
+    animation: wbap-progress-stripes 1s linear infinite;
+}
+
+@keyframes wbap-progress-stripes {
+    0% {
+        background-position: 30px 0;
+    }
+
+    100% {
+        background-position: 0 0;
+    }
+}
+
+
+/* ========== Progress Panel Premium Styles ========== */
+.wbap-progress-panel {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 320px;
+    background: rgba(30, 30, 40, 0.85);
+    /* 深色半透明背景 */
+    backdrop-filter: blur(12px);
+    /* 毛玻璃效果 */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.wbap-progress-panel.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+/* 顶部关闭按钮 */
+.wbap-progress-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    z-index: 2;
+}
+
+.wbap-progress-close:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    transform: rotate(90deg);
+}
+
+.wbap-progress-content {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* 标题样式 */
+#wbap-progress-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 20px;
+    letter-spacing: 0.5px;
+}
+
+/* 进度槽容器 */
+.wbap-progress-bar-container {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* 进度条本体 */
+.wbap-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+    width: 0%;
+    border-radius: 3px;
+    transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    position: relative;
+    box-shadow: 0 0 10px rgba(0, 242, 254, 0.5);
+}
+
+/* 进度条条纹动画 */
+.wbap-progress-bar.animated::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background-image: linear-gradient(45deg,
+            rgba(255, 255, 255, 0.15) 25%,
+            transparent 25%,
+            transparent 50%,
+            rgba(255, 255, 255, 0.15) 50%,
+            rgba(255, 255, 255, 0.15) 75%,
+            transparent 75%,
+            transparent);
+    background-size: 20px 20px;
+    animation: wbap-progress-stripe 1s linear infinite;
+    z-index: 1;
+}
+
+@keyframes wbap-progress-stripe {
+    0% {
+        background-position: 0 0;
+    }
+
+    100% {
+        background-position: 20px 0;
+    }
+}
+
+/* 底部信息栏 */
+.wbap-progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+#wbap-progress-status {
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+#wbap-progress-timer {
+    font-family: 'Roboto Mono', monospace;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #4facfe;
+}
+
+/* 调整大小手柄 */
+.wbap-resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    cursor: nwse-resize;
+    background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.3) 50%);
+    border-bottom-right-radius: 12px;
+    transition: background 0.2s;
+}
+
+.wbap-resize-handle:hover {
+    background: linear-gradient(135deg, transparent 50%, #4facfe 50%);
+}
+
+/* === Optimization Panel Revamp (WeChat Style Fixed) === */
+.wbap-hidden {
+    display: none !important;
+}
+
+/* Overlay Background */
+.wbap-opt-panel-root {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: radial-gradient(120% 140% at 10% 0%, #242b52 0%, #15182a 45%, #0b0d14 100%) !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    z-index: 20000;
+    display: none;
+    /* Javascript toggles this to flex */
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.wbap-opt-panel-root.open {
+    display: flex !important;
+    opacity: 1;
+}
+
+/* Main Container */
+.wbap-opt-container {
+    width: 450px;
+    height: 800px;
+    max-width: 95vw;
+    max-height: 90vh;
+    background: linear-gradient(160deg, #252b4f 0%, #1b1e36 55%, #141625 100%);
+    border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid #343b63;
+    font-family: sans-serif;
+}
+
+/* ============================================================================
+   [29] Chat Optimization Panel (Refactored)
+   ============================================================================ */
+
+/* Chat Stream Container */
+.wbap-chat-stream {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background-color: var(--wbap-bg-panel);
+    /* Consistent bg */
+    scroll-behavior: smooth;
+}
+
+/* Chat Footer Area */
+.wbap-chat-footer {
+    flex-shrink: 0;
+    background-color: var(--wbap-bg-element);
+    border-top: 1px solid var(--wbap-border-color);
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 10;
+}
+
+/* Chat Toolbar */
+.wbap-chat-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.wbap-vertical-divider {
+    width: 1px;
+    height: 16px;
+    background-color: var(--wbap-border-color);
+}
+
+.wbap-input-group-sm {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.wbap-select-sm {
+    background-color: var(--wbap-bg-input);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-sm);
+    color: var(--wbap-text);
+    font-size: 12px;
+    padding: 4px 8px;
+    height: 28px;
+    min-width: 100px;
+    cursor: pointer;
+}
+
+.wbap-select-sm:focus {
+    outline: none;
+    border-color: var(--wbap-primary);
+}
+
+/* Input Row */
+.wbap-chat-input-row {
+    display: flex;
+    align-items: flex-end;
+    /* Align bottom for multiline */
+    gap: 10px;
+    background-color: var(--wbap-bg-input);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-md);
+    padding: 8px 12px;
+    transition: border-color var(--wbap-transition-fast);
+}
+
+.wbap-chat-input-row:focus-within {
+    border-color: var(--wbap-primary-light);
+    box-shadow: var(--wbap-shadow-sm);
+}
+
+.wbap-chat-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--wbap-text);
+    font-size: 14px;
+    resize: none;
+    max-height: 120px;
+    padding: 4px 0;
+    font-family: inherit;
+    line-height: 1.5;
+}
+
+.wbap-chat-input:focus {
+    outline: none;
+}
+
+.wbap-chat-send-actions {
+    display: flex;
+    gap: 6px;
+    padding-bottom: 2px;
+    /* Align with single line text */
+}
+
+/* Chat Bubbles - Refactored */
+.wbap-chat-bubble {
+    display: flex;
+    flex-direction: column;
+    max-width: 85%;
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.wbap-chat-bubble.ai {
+    align-self: flex-start;
+}
+
+.wbap-chat-bubble.user {
+    align-self: flex-end;
+    align-items: flex-end;
+}
+
+.wbap-chat-content {
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.6;
+    word-wrap: break-word;
+    box-shadow: var(--wbap-shadow-sm);
+
+    /* Fixed constraint logic */
+    max-height: 40vh;
+    /* Limit height to 40% of viewport */
+    overflow-y: auto;
+    /* Internal scroll */
+    scrollbar-width: thin;
+    /* Firefox */
+    scrollbar-color: var(--wbap-border-color) transparent;
+}
+
+/* Internal scrollbar styling for Webkit */
+.wbap-chat-content::-webkit-scrollbar {
+    width: 4px;
+}
+
+.wbap-chat-content::-webkit-scrollbar-thumb {
+    background-color: var(--wbap-border-color);
+    border-radius: 4px;
+}
+
+.wbap-chat-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.wbap-chat-bubble.ai .wbap-chat-content {
+    background-color: var(--wbap-bg-secondary);
+    color: var(--wbap-text);
+    border-bottom-left-radius: 2px;
+    border: 1px solid var(--wbap-border-color);
+}
+
+.wbap-chat-bubble.user .wbap-chat-content {
+    background: linear-gradient(135deg, var(--wbap-primary), var(--wbap-accent));
+    color: var(--wbap-text-on-primary);
+    border-bottom-right-radius: 2px;
+}
+
+/* Inner Overlay (Preview) */
+.wbap-inner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--wbap-bg-panel);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+
+    visibility: hidden;
+    opacity: 0;
+    transform: scale(0.98);
+    transition: all var(--wbap-transition-normal);
+}
+
+.wbap-inner-overlay.open {
+    visibility: visible;
+    opacity: 1;
+    transform: scale(1);
+}
+
+.wbap-textarea-full {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+    color: var(--wbap-text);
+    font-size: 14px;
+    font-family: var(--wbap-font-mono);
+    padding: 16px;
+    resize: none;
+    outline: none;
+    line-height: 1.6;
+}
+
+/* Popover Refactor */
+.wbap-popover {
+    bottom: 120px;
+    /* Above footer */
+    left: 20px;
+    width: 280px;
+    background-color: var(--wbap-bg-element);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-md);
+    box-shadow: var(--wbap-shadow-lg);
+    z-index: 2147483645;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    max-height: 300px;
+    position: absolute; /* Positioned container to anchor close button */
+}
+
+.wbap-popover-header {
+    background-color: var(--wbap-bg-secondary);
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--wbap-border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.wbap-popover-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.08);
+    color: var(--wbap-text-primary);
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+    z-index: 1;
+}
+
+.wbap-popover-close:hover {
+    background: rgba(255,255,255,0.15);
+}
+
+.wbap-popover-header {
+    background-color: var(--wbap-bg-secondary);
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--wbap-border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.wbap-popover-content {
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.wbap-popover-backdrop {
+    position: fixed;
+    inset: 0;
+    background: transparent;
+    z-index: 20005;
+}
+
+.wbap-opt-fab {
+    position: fixed;
+    right: 18px;
+    bottom: 96px;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.65));
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25), 0 0 0 2px rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    cursor: pointer;
+    z-index: 20050;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    touch-action: manipulation;
+}
+
+.wbap-opt-fab::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--wbap-opt-fab-img, url('./assets/wbap-fab-kato.png'));
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.96;
+}
+
+.wbap-opt-fab::after {
+    content: '优';
+    position: relative;
+    font-weight: 700;
+    font-size: 18px;
+    color: rgba(0, 0, 0, 0.55);
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
+    mix-blend-mode: multiply;
+}
+
+.wbap-opt-fab:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 22px rgba(0, 0, 0, 0.3), 0 0 0 2px rgba(255, 255, 255, 0.2);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wbap-btn-icon-xs {
+    background: transparent;
+    border: none;
+    color: var(--wbap-text-muted);
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.wbap-btn-icon-xs:hover {
+    color: var(--wbap-text);
+}
+
+
+/* Mobile Tweaks */
+@media (max-width: 767px) {
+    .wbap-chat-footer {
+        padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+
+    .wbap-chat-bubble {
+        max-width: 90%;
+    }
+}
+
+/* ==========================================================================
+   剧情优化面板 (Plot Optimization Panel) - Reconstruction
+   ========================================================================== */
+
+/* 全屏遮罩 */
+.wbap-opt-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 20000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.wbap-opt-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* 主面板 - 玻璃拟态 */
+.wbap-opt-window {
+    width: 800px;
+    height: 600px;
+    max-width: 95vw;
+    max-height: 90vh;
+    background: linear-gradient(135deg, rgba(30, 30, 40, 0.85), rgba(40, 40, 50, 0.7));
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: scale(0.95);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.wbap-opt-overlay.open .wbap-opt-window {
+    transform: scale(1);
+}
+
+/* 顶部栏 */
+.wbap-opt-header {
+    height: 60px;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
+}
+
+.wbap-opt-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+    display: flex;
+    flex-direction: column;
+}
+
+.wbap-opt-subtitle {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    font-weight: normal;
+    margin-top: 2px;
+}
+
+.wbap-opt-header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.wbap-opt-btn-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.wbap-opt-btn-icon:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+/* 聊天区域 */
+.wbap-opt-chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    scroll-behavior: smooth;
+}
+
+/* 气泡通用样式 */
+.wbap-opt-bubble-row {
+    display: flex;
+    width: 100%;
+}
+
+.wbap-opt-bubble-row.assistant {
+    justify-content: flex-start;
+}
+
+.wbap-opt-bubble-row.user {
+    justify-content: flex-end;
+}
+
+.wbap-opt-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    flex-shrink: 0;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* 核心要求：气泡绝对不扩张 + 初始默认大小 */
+.wbap-opt-bubble {
+    width: 480px;
+    /* 固定宽度，或者 max-width: 60%? 图片看起来像是有一定宽度的 */
+    max-width: 70%;
+    height: 120px;
+    /* 默认固定高度，死值 */
+    min-height: 80px;
+    /* 最小高度 */
+
+    /* 严格限制，不允许被内容撑开 */
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    padding: 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
+    border-radius: 16px;
+    position: relative;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* 仅在非常短的内容下，也不允许缩太小，保持一种"卡片"感 */
+.wbap-opt-bubble-content {
+    /* 内部容器 */
+}
+
+/* AI 气泡样式 */
+.wbap-opt-bubble.assistant {
+    background: rgba(40, 40, 50, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top-left-radius: 4px;
+}
+
+/* User 气泡样式 */
+.wbap-opt-bubble.user {
+    background: linear-gradient(135deg, rgba(60, 100, 255, 0.4), rgba(40, 80, 220, 0.3));
+    border: 1px solid rgba(100, 150, 255, 0.3);
+    border-top-right-radius: 4px;
+    text-align: left;
+    /* 即使在右侧，文字也左对齐更易读 */
+}
+
+/* 气泡滚动条美化 */
+.wbap-opt-bubble::-webkit-scrollbar {
+    width: 4px;
+}
+
+.wbap-opt-bubble::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+}
+
+.wbap-opt-bubble::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* 底部输入区 */
+.wbap-opt-footer {
+    padding: 15px 20px 20px 20px;
+    background: rgba(20, 20, 30, 0.4);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* 底部工具条 */
+.wbap-opt-toolbar {
+    display: flex;
+    gap: 8px;
+}
+
+.wbap-opt-pill {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.wbap-opt-pill:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.wbap-opt-pill i {
+    font-size: 14px;
+}
+
+/* 输入框容器 */
+.wbap-opt-input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.wbap-opt-input {
+    width: 100%;
+    height: 50px;
+    /* 固定高度输入框，像微信那样 */
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 12px 50px 12px 16px;
+    /* 右侧留给发送按钮 */
+    color: #fff;
+    font-size: 14px;
+    resize: none;
+    outline: none;
+    font-family: inherit;
+}
+
+.wbap-opt-input:focus {
+    border-color: rgba(100, 150, 255, 0.5);
+    background: rgba(0, 0, 0, 0.4);
+}
+
+/* 发送按钮 */
+.wbap-opt-send-btn {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wbap-opt-send-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.wbap-opt-send-btn.active {
+    color: #4facfe;
+}
+
+/* ============================================================================
+   [32] 剧情优化面板移动端适配 (Mobile Optimization Panel)
+   ============================================================================ */
+@media (max-width: 768px) {
+
+    /* 覆盖全屏遮罩对齐，避免内容偏移 */
+    #wbap-optimization-overlay {
+        align-items: stretch;
+        justify-content: flex-start;
+        padding: 0;
+        height: 100vh;
+        height: 100svh;
+        height: 100dvh;
+    }
+
+    /* 面板容器强制全屏 - 但顶部留出空间 */
+    /* 面板容器强制全屏 */
+    #wbap-optimization-overlay .wbap-opt-window {
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100svh !important;
+        height: 100dvh !important;
+        left: 0 !important;
+        top: 0 !important;
+        /* 强制全屏，不留空隙 */
+        transform: none !important;
+        border-radius: 0 !important;
+        /* 移除圆角 */
+        max-width: 100vw !important;
+        max-height: 100dvh !important;
+        margin: 0 !important;
+        border: none !important;
+        display: flex;
+        flex-direction: column;
+        align-self: stretch;
+
+        background-color: #1e1e24;
+    }
+
+    /* 保证聊天区域自适应高度 */
+    .wbap-opt-chat-area {
+        flex: 1;
+        min-height: 0;
+        /* Important for flex scrolling */
+        overflow-y: auto;
+    }
+
+    /* 保证聊天区域自适应高度 */
+    .wbap-opt-chat-area {
+        flex: 1;
+        height: auto !important;
+        /* Allow flex grow */
+        min-height: 0;
+    }
+
+    /* 调整气泡宽度 */
+    .wbap-opt-bubble {
+        max-width: 85% !important;
+        font-size: 15px;
+        /* 稍微调大字号 */
+    }
+
+    .wbap-opt-bubble-row {
+        margin-bottom: 16px;
+        /* 增加行间距 */
+    }
+
+    /* 底部工具栏布局优化 */
+    .wbap-opt-input-area {
+        gap: 8px;
+        padding: 8px 12px;
+        flex-direction: column-reverse;
+        /* 将工具栏放到输入框上方? 不，保持原样但允许换行 */
+        /* Ensure input area doesn't get covered by keyboard or bottom nav too badly, 
+           though viewport resize usually handles this */
+        padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    }
+
+    .wbap-opt-toolbar {
+        /* Allow scroll if too many items, or wrap */
+        width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 4px;
+        /* Scrollbar space */
+        justify-content: flex-start;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .wbap-opt-pill {
+        flex-shrink: 0;
+        /* Prevent squishing */
+    }
+
+    .wbap-popover-backdrop {
+        z-index: 21990;
+    }
+
+    .wbap-opt-fab {
+        right: 14px;
+        bottom: 82px;
+        width: 68px;
+        height: 68px;
+    }
+
+    /* 弹窗改为底部菜单 (Bottom Sheet) */
+    .wbap-popover.wbap-mobile-bottom-sheet {
+        position: fixed !important;
+        top: auto !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        max-height: 60vh !important;
+        border-radius: 16px 16px 0 0 !important;
+        transform: translateY(100%);
+        animation: wbapSlideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards !important;
+        border: none !important;
+        border-top: 1px solid var(--wbap-border-color);
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4) !important;
+        z-index: 22000 !important;
+        /* Above panel overlay */
+    }
+
+    @keyframes wbapSlideUp {
+        from {
+            transform: translateY(100%);
+        }
+
+        to {
+            transform: translateY(0);
+        }
+    }
+
+    /* Adjust popover content padding for safe area */
+    .wbap-popover-content {
+        padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    }
+
+    /* 预览遮罩全屏 */
+    .wbap-inner-overlay {
+        border-radius: 0 !important;
+    }
+}
