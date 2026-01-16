@@ -2340,8 +2340,218 @@ html.wbap-overlay-open {
     white-space: nowrap;
 }
 
-.wbap-opt-radio-item-sub {
-    font-size: 11px;
-    color: rgba(233, 238, 251, 0.5);
-    margin-top: 2px;
+/* ============================================================================
+   [33] 三级优化提示词编辑器样式 (Added for independent prompt editor)
+   ============================================================================ */
+.wbap-level3-editor {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2147483650;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wbap-level3-editor-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.wbap-level3-editor-container {
+    position: relative;
+    width: 600px;
+    max-width: 95vw;
+    max-height: 85vh;
+    background: var(--wbap-bg-panel);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-lg);
+    box-shadow: var(--wbap-shadow-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.wbap-level3-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--wbap-border-color);
+    flex-shrink: 0;
+}
+
+.wbap-level3-editor-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--wbap-text);
+}
+
+.wbap-level3-editor-body {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.wbap-level3-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.wbap-level3-field label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--wbap-text);
+}
+
+.wbap-level3-textarea {
+    width: 100%;
+    padding: 12px;
+    font-size: 13px;
+    font-family: var(--wbap-font-mono);
+    background: var(--wbap-bg-input);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-sm);
+    color: var(--wbap-text);
+    resize: vertical;
+    min-height: 100px;
+    transition: border-color var(--wbap-transition-fast), box-shadow var(--wbap-transition-fast);
+    box-sizing: border-box;
+}
+
+.wbap-level3-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-family: var(--wbap-font, sans-serif);
+    background: var(--wbap-bg-input);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-sm);
+    color: var(--wbap-text);
+    transition: border-color var(--wbap-transition-fast), box-shadow var(--wbap-transition-fast);
+    box-sizing: border-box;
+}
+
+.wbap-level3-input:focus {
+    outline: none;
+    border-color: var(--wbap-primary);
+    box-shadow: 0 0 0 3px rgba(100, 100, 200, 0.2);
+}
+
+.wbap-level3-textarea:focus {
+    outline: none;
+    border-color: var(--wbap-primary);
+    box-shadow: 0 0 0 3px rgba(100, 100, 200, 0.2);
+}
+
+.wbap-level3-hint {
+    font-size: 12px;
+    color: var(--wbap-text-muted);
+    line-height: 1.5;
+}
+
+.wbap-level3-hint code {
+    background: var(--wbap-bg-secondary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: var(--wbap-font-mono);
+    color: var(--wbap-primary-light);
+}
+
+.wbap-level3-editor-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--wbap-border-color);
+    background: var(--wbap-bg-element);
+    flex-shrink: 0;
+}
+
+.wbap-level3-btn-primary,
+.wbap-level3-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: var(--wbap-border-radius-md);
+    cursor: pointer;
+    transition: all var(--wbap-transition-fast);
+}
+
+.wbap-level3-btn-primary {
+    background: linear-gradient(135deg, var(--wbap-primary), var(--wbap-accent));
+    border: none;
+    color: var(--wbap-text-on-primary);
+    box-shadow: 0 4px 15px rgba(100, 100, 200, 0.3);
+}
+
+.wbap-level3-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(100, 100, 200, 0.4);
+}
+
+.wbap-level3-btn-secondary {
+    background: var(--wbap-bg-element);
+    border: 1px solid var(--wbap-border-color);
+    color: var(--wbap-text-secondary);
+}
+
+.wbap-level3-btn-secondary:hover {
+    background: var(--wbap-bg-element-hover);
+    border-color: var(--wbap-border-color-light);
+    color: var(--wbap-text);
+}
+
+/* 移动端适配 */
+@media (max-width: 767px) {
+    .wbap-level3-editor-container {
+        width: 100vw;
+        max-width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        max-height: 100dvh;
+        border-radius: 0;
+    }
+
+    .wbap-level3-editor-footer {
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+}
+
+/* ============================================================================
+   [34] 通用图标按钮样式 (Added for close button)
+   ============================================================================ */
+.wbap-opt-icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--wbap-text-muted);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--wbap-transition-fast);
+}
+
+.wbap-opt-icon-btn:hover {
+    background: var(--wbap-bg-element-hover);
+    color: var(--wbap-text);
 }

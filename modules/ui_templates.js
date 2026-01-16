@@ -302,25 +302,25 @@
                 </label>
             </div>
 
-            <!-- 剧情优化可折叠区域 -->
-            <div class="wbap-section wbap-collapsible-section" id="wbap-optimization-section">
-                <div class="wbap-collapsible-header">
-                    <label class="wbap-switch-label">
+            <!-- 剧情优化区域 (默认展开) -->
+            <div class="wbap-section" id="wbap-optimization-section">
+                <div class="wbap-section-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <label class="wbap-switch-label" style="margin: 0;">
                         <input type="checkbox" id="wbap-settings-plot-optimization">
                         <span class="wbap-switch-slider"></span>
-                        <span class="wbap-switch-text">启用剧情优化</span>
+                        <span class="wbap-switch-text" style="font-weight: 600;">启用剧情优化</span>
                     </label>
-                    <i class="fa-solid fa-chevron-down wbap-collapse-icon"></i>
                 </div>
-                <div class="wbap-collapsible-content wbap-hidden" id="wbap-optimization-content">
-                    <div class="wbap-form-group" style="margin-top: 12px;">
+                
+                <div id="wbap-optimization-content">
+                    <div class="wbap-form-group">
                         <label class="wbap-switch-label">
                             <input type="checkbox" id="wbap-settings-plot-optimization-fab">
                             <span class="wbap-switch-slider"></span>
                             <span class="wbap-switch-text">启用剧情优化悬浮球（全局快捷入口）</span>
                         </label>
                     </div>
-                    <div class="wbap-form-group" style="margin-top: 12px;">
+                    <div class="wbap-form-group">
                         <label class="wbap-switch-label">
                             <input type="checkbox" id="wbap-settings-level3-enabled">
                             <span class="wbap-switch-slider"></span>
@@ -328,19 +328,20 @@
                         </label>
                     </div>
                     
-                    <!-- 提示词预设选择区域（参考首页样式） -->
-                    <div class="wbap-form-group wbap-opt-prompt-section" style="margin-top: 16px;">
-                        <div class="wbap-opt-prompt-header">
-                            <label>剧情优化提示词预设</label>
-                            <button type="button" id="wbap-opt-edit-prompt" class="wbap-btn wbap-btn-xs wbap-btn-secondary">
-                                <i class="fa-solid fa-pencil"></i> 编辑
-                            </button>
-                        </div>
-                        <div class="wbap-opt-prompt-preview" id="wbap-opt-prompt-preview">
-                            <div class="wbap-opt-prompt-name" id="wbap-opt-prompt-name">默认优化提示词</div>
-                            <div class="wbap-opt-prompt-desc" id="wbap-opt-prompt-desc">点击编辑按钮自定义系统提示词和优化模板...</div>
-                        </div>
+                    <!-- 剧情优化提示词预设 -->
+                    <div class="wbap-form-group" style="margin-top: 16px;">
+                        <label>剧情优化提示词预设</label>
+                        <select id="wbap-opt-prompt-select" class="wbap-preset-select"></select>
                     </div>
+                    <div id="wbap-opt-prompt-desc" class="wbap-prompt-description"></div>
+                    <div class="wbap-prompt-actions-toolbar" style="margin-top: 6px;">
+                        <button id="wbap-opt-prompt-new-btn" class="wbap-btn wbap-btn-xs" title="新建"><i class="fa-solid fa-plus"></i> 新建</button>
+                        <button id="wbap-opt-prompt-import-btn" class="wbap-btn wbap-btn-xs" title="导入"><i class="fa-solid fa-download"></i> 导入</button>
+                        <button id="wbap-opt-prompt-edit-btn" class="wbap-btn wbap-btn-xs" title="编辑"><i class="fa-solid fa-pencil"></i> 编辑</button>
+                        <button id="wbap-opt-prompt-export-btn" class="wbap-btn wbap-btn-xs" title="导出"><i class="fa-solid fa-upload"></i> 导出</button>
+                        <button id="wbap-opt-prompt-delete-btn" class="wbap-btn wbap-btn-xs wbap-btn-danger" title="删除"><i class="fa-solid fa-trash"></i> 删除</button>
+                    </div>
+                    <input type="file" id="wbap-opt-prompt-file-input" accept=".json" class="wbap-hidden">
                     
                     <!-- API配置 -->
                     <div class="wbap-form-group" style="margin-top: 16px;">
@@ -632,6 +633,17 @@
                     <i class="fa-solid fa-file-lines"></i>
                     <span id="wbap-opt-prompt-label">提示词</span>
                 </button>
+                <div id="wbap-opt-prompt-pop" class="wbap-opt-popover wbap-opt-popover-sm wbap-hidden">
+                    <div class="wbap-opt-pop-header">
+                        <div>选择提示词预设</div>
+                        <button id="wbap-opt-prompt-close" class="wbap-opt-icon-btn" type="button">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div class="wbap-opt-pop-body-single">
+                        <div id="wbap-opt-prompt-list" class="wbap-opt-list"></div>
+                    </div>
+                </div>
                 <!-- API 实例选择按钮 + 弹窗 -->
                 <button class="wbap-opt-chip wbap-opt-chip-btn" id="wbap-opt-endpoint-btn" type="button">
                     <i class="fa-solid fa-server"></i>
@@ -710,6 +722,14 @@
             </button>
         </div>
         <div class="wbap-level3-editor-body">
+            <div class="wbap-level3-field">
+                <label for="wbap-level3-prompt-name">预设名称</label>
+                <input id="wbap-level3-prompt-name" class="wbap-level3-input" type="text" placeholder="例如：默认优化提示词">
+            </div>
+            <div class="wbap-level3-field">
+                <label for="wbap-level3-prompt-desc">预设描述</label>
+                <textarea id="wbap-level3-prompt-desc" class="wbap-level3-textarea" rows="3" placeholder="简要说明用途..."></textarea>
+            </div>
             <div class="wbap-level3-field">
                 <label for="wbap-level3-system-prompt">系统提示词</label>
                 <textarea id="wbap-level3-system-prompt" class="wbap-level3-textarea" rows="6" placeholder="定义AI的角色和行为规则..."></textarea>

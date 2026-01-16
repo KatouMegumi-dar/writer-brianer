@@ -461,37 +461,138 @@
             config.aggregatorMode.promptIndex = parseInt(e.target.value, 10) || 0;
         });
 
-        // 剧情优化折叠面板逻辑
         const optimizationCheckbox = document.getElementById('wbap-settings-plot-optimization');
-        const optimizationSection = document.getElementById('wbap-optimization-section');
-        const optimizationContent = document.getElementById('wbap-optimization-content');
-
-        const toggleOptimizationSection = (expanded) => {
-            if (expanded) {
-                optimizationSection?.classList.add('expanded');
-                optimizationContent?.classList.remove('wbap-hidden');
-            } else {
-                optimizationSection?.classList.remove('expanded');
-                optimizationContent?.classList.add('wbap-hidden');
-            }
-        };
-
         optimizationCheckbox?.addEventListener('change', (e) => {
-            toggleOptimizationSection(e.target.checked);
+            setOptimizationSectionState(e.target.checked === true);
         });
 
         // 三级优化开关
         document.getElementById('wbap-settings-level3-enabled')?.addEventListener('change', (e) => {
             const config = WBAP.CharacterManager.getCurrentCharacterConfig();
-            if (!config.optimizationLevel3) config.optimizationLevel3 = { enabled: false, promptTemplate: '', systemPrompt: '', autoConfirm: false };
-            config.optimizationLevel3.enabled = e.target.checked;
+            const level3Cfg = ensureOptimizationPromptConfig(config);
+            level3Cfg.enabled = e.target.checked;
         });
 
-        // 提示词编辑按钮
-        document.getElementById('wbap-opt-edit-prompt')?.addEventListener('click', () => {
-            if (WBAP.Optimization?.openLevel3Editor) {
-                WBAP.Optimization.openLevel3Editor();
+        const optPromptSelect = document.getElementById('wbap-opt-prompt-select');
+        optPromptSelect?.addEventListener('change', (e) => {
+            const config = WBAP.CharacterManager.getCurrentCharacterConfig();
+            const level3Cfg = ensureOptimizationPromptConfig(config);
+            const idx = parseInt(e.target.value, 10) || 0;
+            level3Cfg.selectedPromptIndex = idx;
+            const preset = level3Cfg.promptPresets?.[idx];
+            if (preset) {
+                level3Cfg.systemPrompt = preset.systemPrompt || '';
+                level3Cfg.promptTemplate = preset.promptTemplate || '';
+                config.optimizationSystemPrompt = preset.systemPrompt || '';
             }
+            WBAP.saveConfig();
+            refreshOptimizationPromptList();
+        });
+
+        document.getElementById('wbap-opt-prompt-new-btn')?.addEventListener('click', () => {
+            const config = WBAP.CharacterManager.getCurrentCharacterConfig();
+            const level3Cfg = ensureOptimizationPromptConfig(config);
+            const basePreset = WBAP.Optimization?.getDefaultOptimizationPromptPreset?.() || {
+                name: '优化提示词',
+                description: '',
+                systemPrompt: WBAP.DEFAULT_OPT_SYSTEM_PROMPT || '',
+                promptTemplate: WBAP.DEFAULT_OPT_PROMPT_TEMPLATE || ''
+            };
+            const nextIndex = level3Cfg.promptPresets.length + 1;
+            const newPreset = {
+                ...basePreset,
+                name: `${basePreset.name || '优化提示词'} ${nextIndex}`
+            };
+            level3Cfg.promptPresets.push(newPreset);
+            level3Cfg.selectedPromptIndex = level3Cfg.promptPresets.length - 1;
+            level3Cfg.systemPrompt = newPreset.systemPrompt || '';
+            level3Cfg.promptTemplate = newPreset.promptTemplate || '';
+            config.optimizationSystemPrompt = newPreset.systemPrompt || '';
+            WBAP.saveConfig();
+            refreshOptimizationPromptList();
+            WBAP.Optimization?.openLevel3Editor?.();
+        });
+
+        document.getElementById('wbap-opt-prompt-edit-btn')?.addEventListener('click', () => {
+            WBAP.Optimization?.openLevel3Editor?.();
+        });
+
+        document.getElementById('wbap-opt-prompt-delete-btn')?.addEventListener('click', () => {
+            const config = WBAP.CharacterManager.getCurrentCharacterConfig();
+            const level3Cfg = ensureOptimizationPromptConfig(config);
+            const presets = level3Cfg.promptPresets || [];
+            if (presets.length <= 1) {
+                alert('至少保留一个提示词预设');
+                return;
+            }
+            const idx = level3Cfg.selectedPromptIndex || 0;
+            const target = presets[idx];
+            if (!confirm(`确定删除预设「${target?.name || '未命名'}」？`)) return;
+            presets.splice(idx, 1);
+            level3Cfg.selectedPromptIndex = Math.max(0, Math.min(idx, presets.length - 1));
+            const nextPreset = presets[level3Cfg.selectedPromptIndex];
+            if (nextPreset) {
+                level3Cfg.systemPrompt = nextPreset.systemPrompt || '';
+                level3Cfg.promptTemplate = nextPreset.promptTemplate || '';
+                config.optimizationSystemPrompt = nextPreset.systemPrompt || '';
+            }
+            WBAP.saveConfig();
+            refreshOptimizationPromptList();
+        });
+
+        const optPromptImportBtn = document.getElementById('wbap-opt-prompt-import-btn');
+        const optPromptFileInput = document.getElementById('wbap-opt-prompt-file-input');
+        if (optPromptImportBtn && optPromptFileInput) {
+            optPromptImportBtn.addEventListener('click', () => optPromptFileInput.click());
+            optPromptFileInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                try {
+                    const content = await file.text();
+                    const parsed = JSON.parse(content);
+                    const preset = {
+                        name: parsed.name || '导入提示词',
+                        description: parsed.description || '',
+                        systemPrompt: parsed.systemPrompt || '',
+                        promptTemplate: parsed.promptTemplate || ''
+                    };
+                    if (!preset.systemPrompt && !preset.promptTemplate) {
+                        throw new Error('提示词内容为空');
+                    }
+                    const config = WBAP.CharacterManager.getCurrentCharacterConfig();
+                    const level3Cfg = ensureOptimizationPromptConfig(config);
+                    level3Cfg.promptPresets.push(preset);
+                    level3Cfg.selectedPromptIndex = level3Cfg.promptPresets.length - 1;
+                    level3Cfg.systemPrompt = preset.systemPrompt || '';
+                    level3Cfg.promptTemplate = preset.promptTemplate || '';
+                    config.optimizationSystemPrompt = preset.systemPrompt || '';
+                    WBAP.saveConfig();
+                    refreshOptimizationPromptList();
+                } catch (err) {
+                    Logger.error('导入剧情优化提示词失败:', err);
+                    alert('导入失败: ' + err.message);
+                } finally {
+                    optPromptFileInput.value = '';
+                }
+            });
+        }
+
+        document.getElementById('wbap-opt-prompt-export-btn')?.addEventListener('click', () => {
+            const config = WBAP.CharacterManager.getCurrentCharacterConfig();
+            const level3Cfg = ensureOptimizationPromptConfig(config);
+            const presets = level3Cfg.promptPresets || [];
+            const idx = level3Cfg.selectedPromptIndex || 0;
+            const preset = presets[idx];
+            if (!preset) return;
+            const safeName = (preset.name || 'optimization_prompt').replace(/[\\/:*?"<>|]/g, '_');
+            const dataStr = JSON.stringify(preset, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${safeName}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
         });
 
         document.getElementById('wbap-optimization-use-independent')?.addEventListener('change', (e) => {
@@ -549,7 +650,6 @@
             config.showProgressPanel = document.getElementById('wbap-settings-progress-panel')?.checked !== false;
             config.enablePlotOptimization = document.getElementById('wbap-settings-plot-optimization')?.checked === true;
             config.enablePlotOptimizationFloatButton = document.getElementById('wbap-settings-plot-optimization-fab')?.checked === true;
-            config.optimizationSystemPrompt = document.getElementById('wbap-settings-optimization-prompt')?.value || '';
             const optimizationApiConfig = ensureOptimizationApiConfig(config);
             optimizationApiConfig.useIndependentProfile = document.getElementById('wbap-optimization-use-independent')?.checked === true;
             optimizationApiConfig.selectedEndpointId = document.getElementById('wbap-optimization-endpoint-select')?.value || null;
@@ -659,11 +759,41 @@
         return config.optimizationApiConfig;
     }
 
+    function ensureOptimizationPromptConfig(config) {
+        if (!config.optimizationLevel3) {
+            config.optimizationLevel3 = { enabled: false, promptTemplate: '', systemPrompt: '', autoConfirm: false };
+        }
+        if (!Array.isArray(config.optimizationLevel3.promptPresets) || config.optimizationLevel3.promptPresets.length === 0) {
+            const fallbackPreset = WBAP.Optimization?.getDefaultOptimizationPromptPreset?.() || {
+                name: '默认优化提示词',
+                description: '保持人设与世界观一致的剧情润色',
+                systemPrompt: WBAP.DEFAULT_OPT_SYSTEM_PROMPT || '',
+                promptTemplate: WBAP.DEFAULT_OPT_PROMPT_TEMPLATE || ''
+            };
+            config.optimizationLevel3.promptPresets = [fallbackPreset];
+            config.optimizationLevel3.selectedPromptIndex = 0;
+        }
+        if (config.optimizationLevel3.selectedPromptIndex == null) {
+            config.optimizationLevel3.selectedPromptIndex = 0;
+        }
+        return config.optimizationLevel3;
+    }
+
     function toggleOptimizationApiBlocks(useIndependent) {
         const independentBlock = document.getElementById('wbap-optimization-independent-block');
         const endpointBlock = document.getElementById('wbap-optimization-endpoint-block');
         if (independentBlock) independentBlock.classList.toggle('wbap-hidden', !useIndependent);
         if (endpointBlock) endpointBlock.classList.toggle('wbap-hidden', useIndependent);
+    }
+
+    function setOptimizationSectionState(enabled) {
+        const section = document.getElementById('wbap-optimization-section');
+        const content = document.getElementById('wbap-optimization-content');
+        if (section) section.classList.toggle('expanded', !!enabled);
+        if (content) {
+            content.classList.toggle('wbap-hidden', !enabled);
+            content.classList.toggle('wbap-disabled', !enabled);
+        }
     }
 
     function renderOptimizationEndpointOptions(selectedId = null) {
@@ -790,31 +920,9 @@
         }
 
         // 根据启用状态展开/折叠设置区域
-        const optimizationSection = document.getElementById('wbap-optimization-section');
-        const optimizationContent = document.getElementById('wbap-optimization-content');
-        if (config.enablePlotOptimization === true) {
-            optimizationSection?.classList.add('expanded');
-            optimizationContent?.classList.remove('wbap-hidden');
-        } else {
-            optimizationSection?.classList.remove('expanded');
-            optimizationContent?.classList.add('wbap-hidden');
-        }
+        setOptimizationSectionState(config.enablePlotOptimization === true);
 
-        // 更新提示词预设显示
-        const level3Cfg = config.optimizationLevel3 || {};
-        const promptNameEl = document.getElementById('wbap-opt-prompt-name');
-        const promptDescEl = document.getElementById('wbap-opt-prompt-desc');
-        if (promptNameEl) {
-            promptNameEl.textContent = level3Cfg.systemPrompt?.split('\n')[0]?.slice(0, 30) || '默认优化提示词';
-        }
-        if (promptDescEl) {
-            promptDescEl.textContent = level3Cfg.promptTemplate?.slice(0, 80) || '点击编辑按钮自定义系统提示词和优化模板...';
-        }
-
-        const optimizationPromptEl = document.getElementById('wbap-settings-optimization-prompt');
-        if (optimizationPromptEl) {
-            optimizationPromptEl.value = config.optimizationSystemPrompt || '';
-        }
+        refreshOptimizationPromptList();
         const optimizationApiConfig = ensureOptimizationApiConfig(config);
         const optimizationUseEl = document.getElementById('wbap-optimization-use-independent');
         if (optimizationUseEl) {
@@ -936,6 +1044,43 @@
             promptEl.value = idx;
             cfg.aggregatorMode.promptIndex = idx;
         }
+    }
+
+    function refreshOptimizationPromptList() {
+        const selectEl = document.getElementById('wbap-opt-prompt-select');
+        const descEl = document.getElementById('wbap-opt-prompt-desc');
+        const editBtn = document.getElementById('wbap-opt-prompt-edit-btn');
+        const exportBtn = document.getElementById('wbap-opt-prompt-export-btn');
+        const deleteBtn = document.getElementById('wbap-opt-prompt-delete-btn');
+        if (!selectEl || !descEl) return;
+
+        const config = WBAP.CharacterManager ? WBAP.CharacterManager.getCurrentCharacterConfig() : WBAP.config;
+        const level3Cfg = ensureOptimizationPromptConfig(config);
+        const presets = level3Cfg.promptPresets || [];
+        const hasPresets = presets.length > 0;
+
+        selectEl.disabled = !hasPresets;
+        if (editBtn) editBtn.disabled = !hasPresets;
+        if (exportBtn) exportBtn.disabled = !hasPresets;
+        if (deleteBtn) deleteBtn.disabled = !hasPresets;
+
+        if (!hasPresets) {
+            selectEl.innerHTML = '<option>无可用预设</option>';
+            descEl.textContent = '请新建或导入一个提示词预设。';
+            return;
+        }
+
+        let idx = level3Cfg.selectedPromptIndex || 0;
+        if (idx >= presets.length) {
+            idx = presets.length - 1;
+            level3Cfg.selectedPromptIndex = idx;
+            WBAP.saveConfig();
+        }
+
+        selectEl.innerHTML = presets.map((p, index) => `<option value="${index}">${p.name || `未命名预设 ${index + 1}`}</option>`).join('');
+        selectEl.value = idx;
+        descEl.textContent = presets[idx]?.description || '此预设没有描述。';
+        WBAP.Optimization?.updatePromptLabel?.();
     }
 
 
@@ -1556,6 +1701,7 @@
         renderApiEndpoints,
         loadSettingsToUI,
         refreshPromptList,
+        refreshOptimizationPromptList,
         refreshSecondaryPromptUI,
         showProgressPanel,
         updateProgressPanel,

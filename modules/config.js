@@ -20,6 +20,22 @@
         };
     }
 
+    const DEFAULT_OPT_SYSTEM_PROMPT = [
+        '你是一名剧情优化助手，负责在保留人设和世界书设定的前提下，润色和改写剧情片段。',
+        '请保持语气一致，补足氛围描写，强化场景细节，避免违背角色底线。',
+        '输出一段可直接替换原文的精炼文本，避免解释过程。'
+    ].join('\n');
+    const DEFAULT_OPT_PROMPT_TEMPLATE = '请优化以下剧情内容，保持人设和世界观一致：\n\n{input}';
+
+    function createDefaultOptimizationPromptPreset() {
+        return {
+            name: '默认优化提示词',
+            description: '保持人设与世界观一致的剧情润色',
+            systemPrompt: DEFAULT_OPT_SYSTEM_PROMPT,
+            promptTemplate: DEFAULT_OPT_PROMPT_TEMPLATE
+        };
+    }
+
     // 单角色配置默认值（自选模式）
     function createDefaultCharacterConfig() {
         return {
@@ -76,7 +92,9 @@
                 enabled: false,
                 promptTemplate: '',
                 systemPrompt: '',
-                autoConfirm: false
+                autoConfirm: false,
+                promptPresets: [createDefaultOptimizationPromptPreset()],
+                selectedPromptIndex: 0
             }
         };
     }
@@ -186,9 +204,29 @@
                     enabled: false,
                     promptTemplate: '',
                     systemPrompt: '',
-                    autoConfirm: false
+                    autoConfirm: false,
+                    promptPresets: [createDefaultOptimizationPromptPreset()],
+                    selectedPromptIndex: 0
                 };
                 migrated = true;
+            } else {
+                const level3Cfg = charConfig.optimizationLevel3;
+                if (!Array.isArray(level3Cfg.promptPresets) || level3Cfg.promptPresets.length === 0) {
+                    const baseSystem = level3Cfg.systemPrompt || charConfig.optimizationSystemPrompt || DEFAULT_OPT_SYSTEM_PROMPT;
+                    const baseTemplate = level3Cfg.promptTemplate || DEFAULT_OPT_PROMPT_TEMPLATE;
+                    level3Cfg.promptPresets = [{
+                        name: '默认优化提示词',
+                        description: '保持人设与世界观一致的剧情润色',
+                        systemPrompt: baseSystem,
+                        promptTemplate: baseTemplate
+                    }];
+                    level3Cfg.selectedPromptIndex = 0;
+                    migrated = true;
+                }
+                if (level3Cfg.selectedPromptIndex == null) {
+                    level3Cfg.selectedPromptIndex = 0;
+                    migrated = true;
+                }
             }
         }
         return migrated;
@@ -256,5 +294,8 @@
     window.WBAP.loadConfig = loadConfig;
     window.WBAP.saveConfig = saveConfig;
     window.WBAP.EXTENSION_NAME = EXTENSION_NAME;
+    window.WBAP.DEFAULT_OPT_SYSTEM_PROMPT = DEFAULT_OPT_SYSTEM_PROMPT;
+    window.WBAP.DEFAULT_OPT_PROMPT_TEMPLATE = DEFAULT_OPT_PROMPT_TEMPLATE;
+    window.WBAP.createDefaultOptimizationPromptPreset = createDefaultOptimizationPromptPreset;
 
 })();

@@ -7,11 +7,14 @@
     const Logger = WBAP.Logger || console;
 
     const INITIAL_AI_MESSAGE = '你好！我是你的剧情优化助手。已为您生成了初步方案，点击右上角的预览图标即可查看全文。';
-    const DEFAULT_SYSTEM_PROMPT = [
+    const DEFAULT_SYSTEM_PROMPT = WBAP.DEFAULT_OPT_SYSTEM_PROMPT || [
         '你是一名剧情优化助手，负责在保留人设和世界书设定的前提下，润色和改写剧情片段。',
         '请保持语气一致，补足氛围描写，强化场景细节，避免违背角色底线。',
         '输出一段可直接替换原文的精炼文本，避免解释过程。'
     ].join('\n');
+    const DEFAULT_PROMPT_TEMPLATE = WBAP.DEFAULT_OPT_PROMPT_TEMPLATE || '请优化以下剧情内容，保持人设和世界观一致：\n\n{input}';
+    const DEFAULT_PRESET_NAME = '默认优化提示词';
+    const DEFAULT_PRESET_DESC = '保持人设与世界观一致的剧情润色';
 
     const state = {
         initialized: false,
@@ -47,6 +50,52 @@
         return WBAP.config || {};
     }
 
+    function getDefaultOptimizationPromptPreset() {
+        return {
+            name: DEFAULT_PRESET_NAME,
+            description: DEFAULT_PRESET_DESC,
+            systemPrompt: DEFAULT_SYSTEM_PROMPT,
+            promptTemplate: DEFAULT_PROMPT_TEMPLATE
+        };
+    }
+
+    function ensureOptimizationPromptPresets(cfg) {
+        if (!cfg.optimizationLevel3) {
+            cfg.optimizationLevel3 = {
+                enabled: false,
+                promptTemplate: '',
+                systemPrompt: '',
+                autoConfirm: false,
+                promptPresets: [getDefaultOptimizationPromptPreset()],
+                selectedPromptIndex: 0
+            };
+        }
+        const level3Cfg = cfg.optimizationLevel3;
+        if (!Array.isArray(level3Cfg.promptPresets) || level3Cfg.promptPresets.length === 0) {
+            level3Cfg.promptPresets = [getDefaultOptimizationPromptPreset()];
+            level3Cfg.selectedPromptIndex = 0;
+        }
+        if (level3Cfg.selectedPromptIndex == null) {
+            level3Cfg.selectedPromptIndex = 0;
+        }
+        return level3Cfg;
+    }
+
+    function getSelectedOptimizationPromptPreset() {
+        const cfg = getConfig();
+        const level3Cfg = ensureOptimizationPromptPresets(cfg);
+        const presets = level3Cfg.promptPresets || [];
+        let idx = level3Cfg.selectedPromptIndex || 0;
+        if (idx < 0 || idx >= presets.length) idx = 0;
+        const preset = presets[idx] || {};
+        return {
+            name: preset.name || DEFAULT_PRESET_NAME,
+            description: preset.description || DEFAULT_PRESET_DESC,
+            systemPrompt: (preset.systemPrompt || level3Cfg.systemPrompt || cfg.optimizationSystemPrompt || DEFAULT_SYSTEM_PROMPT).trim() || DEFAULT_SYSTEM_PROMPT,
+            promptTemplate: preset.promptTemplate || level3Cfg.promptTemplate || DEFAULT_PROMPT_TEMPLATE
+        };
+    }
+
     function ensurePanelInjected() {
         if (state.elements.root) return;
         const tpl = WBAP.UI_TEMPLATES?.OPTIMIZATION_PANEL_HTML;
@@ -69,6 +118,10 @@
         state.elements.previewToggle = root.querySelector('#wbap-opt-preview-toggle');
         state.elements.worldBtn = root.querySelector('#wbap-opt-world-btn');
         state.elements.worldLabel = root.querySelector('#wbap-opt-world-label');
+        state.elements.promptLabel = root.querySelector('#wbap-opt-prompt-label');
+        state.elements.promptBtn = root.querySelector('#wbap-opt-prompt-btn');
+        state.elements.promptPop = root.querySelector('#wbap-opt-prompt-pop');
+        state.elements.promptList = root.querySelector('#wbap-opt-prompt-list');
         state.elements.worldPop = root.querySelector('#wbap-opt-world-pop');
         state.elements.worldList = root.querySelector('#wbap-opt-world-list');
         state.elements.entryList = root.querySelector('#wbap-opt-entry-list');
@@ -95,7 +148,7 @@
     }
 
     function bindPanelEvents() {
-        const { root, input, sendBtn, previewToggle, previewOverlay, worldBtn, modelRefresh } = state.elements;
+        const { root, input, sendBtn, previewToggle, previewOverlay, worldBtn, modelRefresh, promptBtn } = state.elements;
         if (!root) return;
 
         root.querySelector('#wbap-opt-close')?.addEventListener('click', closePanel);
@@ -125,6 +178,12 @@
         worldPop?.querySelector('#wbap-opt-world-apply')?.addEventListener('click', hideWorldPopover);
         worldPop?.querySelector('#wbap-opt-world-clear')?.addEventListener('click', clearWorldSelection);
 
+        // 提示词弹窗事件
+        if (promptBtn) {
+            promptBtn.addEventListener('click', togglePromptPopover);
+        }
+        root.querySelector('#wbap-opt-prompt-close')?.addEventListener('click', hidePromptPopover);
+
         // API实例弹窗事件
         state.elements.endpointBtn?.addEventListener('click', toggleEndpointPopover);
         root.querySelector('#wbap-opt-endpoint-close')?.addEventListener('click', hideEndpointPopover);
@@ -141,11 +200,6 @@
         // Level3 模式按钮事件
         state.elements.confirmBtn?.addEventListener('click', confirmLevel3);
         state.elements.skipBtn?.addEventListener('click', skipLevel3);
-
-        // 提示词选择按钮
-        root.querySelector('#wbap-opt-prompt-btn')?.addEventListener('click', () => {
-            openLevel3Editor();
-        });
 
         // 点击遮罩关闭预览
         previewOverlay?.addEventListener('click', (e) => {
@@ -206,6 +260,7 @@
         root.classList.remove('wbap-hidden');
         loadWorldList(false);
         updateWorldLabel();
+        updatePromptLabel();
         // 初始化API实例和模型状态
         renderEndpointList();
         loadCurrentEndpointModel();
@@ -378,6 +433,9 @@
         if (isOpen) {
             hideWorldPopover();
         } else {
+            hidePromptPopover();
+            hideEndpointPopover();
+            hideModelPopover();
             pop.classList.remove('wbap-hidden');
             loadWorldList(false);
         }
@@ -403,6 +461,86 @@
         labelEl.textContent = count > 0 ? `世界书 (${count})` : '世界书';
     }
 
+    function updatePromptLabel() {
+        const labelEl = state.elements.promptLabel;
+        if (!labelEl) return;
+        const preset = getSelectedOptimizationPromptPreset();
+        labelEl.textContent = preset?.name || '提示词';
+    }
+
+    function togglePromptPopover() {
+        const pop = state.elements.promptPop;
+        if (!pop) return;
+        const isOpen = !pop.classList.contains('wbap-hidden');
+        if (isOpen) {
+            hidePromptPopover();
+        } else {
+            hideWorldPopover();
+            hideEndpointPopover();
+            hideModelPopover();
+            pop.classList.remove('wbap-hidden');
+            renderPromptList();
+        }
+    }
+
+    function hidePromptPopover() {
+        const pop = state.elements.promptPop;
+        if (pop) pop.classList.add('wbap-hidden');
+    }
+
+    function renderPromptList() {
+        const list = state.elements.promptList;
+        if (!list) return;
+        const cfg = getConfig();
+        const level3Cfg = ensureOptimizationPromptPresets(cfg);
+        const presets = level3Cfg.promptPresets || [];
+        let selectedIndex = level3Cfg.selectedPromptIndex || 0;
+        if (selectedIndex >= presets.length) selectedIndex = 0;
+
+        if (presets.length === 0) {
+            list.innerHTML = '<div class="wbap-opt-empty">暂无提示词预设</div>';
+            return;
+        }
+
+        list.innerHTML = presets.map((preset, idx) => {
+            const name = preset?.name || `预设${idx + 1}`;
+            const selectedClass = idx === selectedIndex ? ' selected' : '';
+            return `
+                <div class="wbap-opt-radio-item${selectedClass}" data-idx="${idx}">
+                    <span class="wbap-opt-radio-item-text">${escapeHtml(name)}</span>
+                </div>
+            `;
+        }).join('');
+
+        list.querySelectorAll('.wbap-opt-radio-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const idx = parseInt(item.dataset.idx, 10);
+                if (Number.isFinite(idx)) {
+                    selectPromptPreset(idx);
+                }
+            });
+        });
+    }
+
+    function selectPromptPreset(index) {
+        const cfg = getConfig();
+        const level3Cfg = ensureOptimizationPromptPresets(cfg);
+        const presets = level3Cfg.promptPresets || [];
+        const preset = presets[index];
+        if (!preset) return;
+
+        level3Cfg.selectedPromptIndex = index;
+        level3Cfg.systemPrompt = preset.systemPrompt || '';
+        level3Cfg.promptTemplate = preset.promptTemplate || '';
+        cfg.optimizationSystemPrompt = preset.systemPrompt || '';
+
+        WBAP.saveConfig?.();
+        updatePromptLabel();
+        renderPromptList();
+        WBAP.UI?.refreshOptimizationPromptList?.();
+        hidePromptPopover();
+    }
+
     // ==================== API实例弹窗逻辑 ====================
     function toggleEndpointPopover() {
         const pop = state.elements.endpointPop;
@@ -413,6 +551,7 @@
         } else {
             hideModelPopover(); // 关闭其他弹窗
             hideWorldPopover();
+            hidePromptPopover();
             pop.classList.remove('wbap-hidden');
             renderEndpointList();
         }
@@ -522,6 +661,7 @@
         } else {
             hideEndpointPopover(); // 关闭其他弹窗
             hideWorldPopover();
+            hidePromptPopover();
             pop.classList.remove('wbap-hidden');
             renderModelList();
         }
@@ -642,7 +782,8 @@
 
             const worldbookContent = await buildSelectedWorldbookContent();
 
-            const systemPrompt = (getConfig().optimizationSystemPrompt || '').trim() || DEFAULT_SYSTEM_PROMPT;
+            const preset = getSelectedOptimizationPromptPreset();
+            const systemPrompt = (preset.systemPrompt || '').trim() || DEFAULT_SYSTEM_PROMPT;
             const prompt = buildOptimizationPrompt(userText, worldbookContent);
 
             // 带取消信号的API调用
@@ -894,8 +1035,6 @@
      * 自动处理三级优化（无需用户确认）
      */
     async function autoProcessLevel3(inputText, context) {
-        const cfg = getConfig();
-        const level3Cfg = cfg.optimizationLevel3 || {};
         const { apiConfig, model } = resolveApiConfig();
 
         if (!model) {
@@ -903,8 +1042,9 @@
             return inputText;
         }
 
-        const systemPrompt = level3Cfg.systemPrompt || DEFAULT_SYSTEM_PROMPT;
-        const promptTemplate = level3Cfg.promptTemplate || '请优化以下剧情内容：\n\n{input}';
+        const preset = getSelectedOptimizationPromptPreset();
+        const systemPrompt = preset.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+        const promptTemplate = preset.promptTemplate || DEFAULT_PROMPT_TEMPLATE;
         const prompt = promptTemplate.replace('{input}', inputText).replace('{worldbook}', context.worldbookContent || '');
 
         try {
@@ -926,6 +1066,7 @@
         root.classList.remove('wbap-hidden');
         renderEndpointList();
         loadCurrentEndpointModel();
+        updatePromptLabel();
         scrollChatToBottom();
         updateLevel3Buttons();
     }
@@ -1020,9 +1161,21 @@
     let level3EditorInjected = false;
 
     function ensureLevel3EditorInjected() {
-        if (level3EditorInjected) return;
+        // 始终检查 DOM 元素是否存在，防止因页面刷新或重新渲染导致的元素丢失
+        const existingEditor = document.getElementById('wbap-level3-prompt-editor');
+        if (existingEditor) {
+            level3EditorInjected = true;
+            return;
+        }
+
+        // 如果元素不存在，重置标志位并重新注入
+        level3EditorInjected = false;
+
         const tpl = WBAP.UI_TEMPLATES?.LEVEL3_PROMPT_EDITOR_HTML;
-        if (!tpl) return;
+        if (!tpl) {
+            console.error('[WriterBrianer] Error: LEVEL3_PROMPT_EDITOR_HTML template not found.');
+            return;
+        }
 
         const container = document.createElement('div');
         container.innerHTML = tpl;
@@ -1035,8 +1188,8 @@
 
         editor.querySelector('#wbap-level3-editor-close')?.addEventListener('click', closeLevel3Editor);
         editor.querySelector('.wbap-level3-editor-overlay')?.addEventListener('click', closeLevel3Editor);
+        editor.querySelector('#wbap-level3-reset')?.addEventListener('click', resetLevel3Prompts); // 注意：这里原代码是 resetLevel3Prompts 而非 saveLevel3Prompts，需确认
         editor.querySelector('#wbap-level3-save')?.addEventListener('click', saveLevel3Prompts);
-        editor.querySelector('#wbap-level3-reset')?.addEventListener('click', resetLevel3Prompts);
     }
 
     function openLevel3Editor() {
@@ -1046,16 +1199,28 @@
 
         // 加载当前配置
         const cfg = getConfig();
-        const level3Cfg = cfg.optimizationLevel3 || {};
+        const level3Cfg = ensureOptimizationPromptPresets(cfg);
+        const presets = level3Cfg.promptPresets || [];
+        let idx = level3Cfg.selectedPromptIndex || 0;
+        if (idx < 0 || idx >= presets.length) idx = 0;
+        const preset = presets[idx] || getDefaultOptimizationPromptPreset();
 
+        const nameEl = editor.querySelector('#wbap-level3-prompt-name');
+        const descEl = editor.querySelector('#wbap-level3-prompt-desc');
         const systemPromptEl = editor.querySelector('#wbap-level3-system-prompt');
         const templateEl = editor.querySelector('#wbap-level3-prompt-template');
 
+        if (nameEl) {
+            nameEl.value = preset.name || DEFAULT_PRESET_NAME;
+        }
+        if (descEl) {
+            descEl.value = preset.description || '';
+        }
         if (systemPromptEl) {
-            systemPromptEl.value = level3Cfg.systemPrompt || '';
+            systemPromptEl.value = preset.systemPrompt || '';
         }
         if (templateEl) {
-            templateEl.value = level3Cfg.promptTemplate || '';
+            templateEl.value = preset.promptTemplate || '';
         }
 
         editor.classList.remove('wbap-hidden');
@@ -1068,30 +1233,56 @@
 
     function saveLevel3Prompts() {
         const cfg = getConfig();
-        if (!cfg.optimizationLevel3) cfg.optimizationLevel3 = {};
+        const level3Cfg = ensureOptimizationPromptPresets(cfg);
 
+        const nameEl = document.getElementById('wbap-level3-prompt-name');
+        const descEl = document.getElementById('wbap-level3-prompt-desc');
         const systemPromptEl = document.getElementById('wbap-level3-system-prompt');
         const templateEl = document.getElementById('wbap-level3-prompt-template');
 
-        cfg.optimizationLevel3.systemPrompt = systemPromptEl?.value || '';
-        cfg.optimizationLevel3.promptTemplate = templateEl?.value || '';
+        const presets = level3Cfg.promptPresets || [];
+        let idx = level3Cfg.selectedPromptIndex || 0;
+        if (idx < 0 || idx >= presets.length) idx = 0;
+        const updated = {
+            name: (nameEl?.value || '').trim() || DEFAULT_PRESET_NAME,
+            description: (descEl?.value || '').trim(),
+            systemPrompt: systemPromptEl?.value || '',
+            promptTemplate: templateEl?.value || ''
+        };
+        presets[idx] = { ...presets[idx], ...updated };
+        level3Cfg.promptPresets = presets;
+        level3Cfg.selectedPromptIndex = idx;
+        level3Cfg.systemPrompt = updated.systemPrompt;
+        level3Cfg.promptTemplate = updated.promptTemplate;
+        cfg.optimizationSystemPrompt = updated.systemPrompt;
 
         WBAP.saveConfig?.();
         closeLevel3Editor();
+        WBAP.UI?.refreshOptimizationPromptList?.();
+        updatePromptLabel();
 
         // 简单提示
         Logger.log('三级优化提示词已保存');
     }
 
     function resetLevel3Prompts() {
+        const defaultPreset = getDefaultOptimizationPromptPreset();
+        const nameEl = document.getElementById('wbap-level3-prompt-name');
+        const descEl = document.getElementById('wbap-level3-prompt-desc');
         const systemPromptEl = document.getElementById('wbap-level3-system-prompt');
         const templateEl = document.getElementById('wbap-level3-prompt-template');
 
+        if (nameEl) {
+            nameEl.value = defaultPreset.name || DEFAULT_PRESET_NAME;
+        }
+        if (descEl) {
+            descEl.value = defaultPreset.description || '';
+        }
         if (systemPromptEl) {
-            systemPromptEl.value = DEFAULT_SYSTEM_PROMPT;
+            systemPromptEl.value = defaultPreset.systemPrompt || DEFAULT_SYSTEM_PROMPT;
         }
         if (templateEl) {
-            templateEl.value = '请优化以下剧情内容，保持人设和世界观一致：\n\n{input}';
+            templateEl.value = defaultPreset.promptTemplate || DEFAULT_PROMPT_TEMPLATE;
         }
     }
 
@@ -1101,6 +1292,7 @@
         openPanel,
         closePanel,
         updateFloatingButtonVisibility,
+        updatePromptLabel,
         resetChat,
         // 三级优化 API
         processLevel3,
@@ -1109,7 +1301,9 @@
         cancelLevel3,
         // 提示词编辑器 API
         openLevel3Editor,
-        closeLevel3Editor
+        closeLevel3Editor,
+        getDefaultOptimizationPromptPreset,
+        getSelectedOptimizationPromptPreset
     };
 
     if (document.readyState === 'loading') {
