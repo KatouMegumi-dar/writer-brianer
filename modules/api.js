@@ -120,164 +120,237 @@
         return text; // 返回原始文本（如果无法解析）
     }
 
+    const inFlightRequests = new Map();
 
+    function getEndpointKey(apiConfig, apiUrl, modelName) {
+        return apiConfig?.id || apiConfig?.endpointId || apiUrl || modelName || 'unknown';
+    }
+
+    function shouldUseCache(apiConfig) {
+        if (apiConfig?.enableCache === true) return true;
+        if (apiConfig?.enableCache === false) return false;
+        return Number.isFinite(apiConfig?.cacheTtlMs) && apiConfig.cacheTtlMs > 0;
+    }
+
+    function resolveCacheTtl(apiConfig) {
+        if (Number.isFinite(apiConfig?.cacheTtlMs) && apiConfig.cacheTtlMs > 0) {
+            return apiConfig.cacheTtlMs;
+        }
+        return CACHE_TTL;
+    }
 
     async function callAI(modelName, prompt, systemPrompt = '', apiConfig = null) {
-        let apiUrl = apiConfig?.apiUrl || apiConfig?.url;
-        if (!modelName && apiUrl) throw new Error('模型名称不能为空');
-        const apiKey = apiConfig?.apiKey || apiConfig?.key;
-        const timeoutSec = (apiConfig?.timeout && apiConfig.timeout > 0) ? apiConfig.timeout : 60;
-        const maxRetries = Number.isInteger(apiConfig?.maxRetries) ? Math.max(0, apiConfig.maxRetries) : 2; // 默认增加重试次数
-        const baseRetryDelay = apiConfig?.retryDelayMs ?? 1000;
-        const onProgress = (typeof apiConfig?.onProgress === 'function') ? apiConfig.onProgress : null;
-        const onToken = (typeof apiConfig?.onToken === 'function') ? apiConfig.onToken : null;
-        const enableStreaming = apiConfig?.enableStreaming !== false;
+        const modelKey = modelName || apiConfig?.model || 'internal';
+        const apiUrlKey = apiConfig?.apiUrl || apiConfig?.url || '';
+        const endpointKey = getEndpointKey(apiConfig, apiUrlKey, modelKey);
+        const useCache = shouldUseCache(apiConfig);
+        const allowDedupe = apiConfig?.dedupe !== false;
+        const requestKey = (useCache || allowDedupe)
+            ? computeCacheKey(modelKey, systemPrompt || '', prompt || '', endpointKey)
+            : null;
+        const cacheTtlMs = useCache ? resolveCacheTtl(apiConfig) : 0;
 
-        const sleep = (ms) => new Promise(res => setTimeout(res, ms));
-
-        // 智能重试判断
-        const shouldRetry = (err, status, attempt) => {
-            if (attempt >= maxRetries) return false;
-            if (err?.name === 'AbortError') return false; // 用户主动取消不重试
-
-            // 网络错误 (status === 0 或 undefined) -> 重试
-            if (!status || status === 0) return true;
-
-            // 429 Too Many Requests -> 重试
-            if (status === 429) return true;
-
-            // 5xx Server Errors -> 重试 (500, 502, 503, 504)
-            if (status >= 500) return true;
-
-            return false;
-        };
-
-        // 计算带抖动的退避时间
-        const getBackoffDelay = (attempt) => {
-            const exp = Math.pow(2, attempt);
-            const jitter = Math.random() * 0.5 + 0.5; // 0.5 ~ 1.0 jitter
-            return Math.min(baseRetryDelay * exp * jitter, 10000); // 上限 10秒
-        };
-
-        // 组合信号
-        const baseTimeoutSignal = createTimeoutSignal(timeoutSec * 1000);
-        let mergedSignal = baseTimeoutSignal;
-        if (apiConfig?.signal) {
-            if (typeof AbortSignal.any === 'function') {
-                mergedSignal = AbortSignal.any([apiConfig.signal, baseTimeoutSignal]);
-            } else {
-                const controller = new AbortController();
-                const abort = () => controller.abort();
-                apiConfig.signal.addEventListener('abort', abort, { once: true });
-                baseTimeoutSignal.addEventListener('abort', abort, { once: true });
-                mergedSignal = controller.signal;
-            }
+        if (requestKey && useCache) {
+            const cached = getCachedResponse(requestKey, cacheTtlMs);
+            if (cached !== null) return cached;
         }
 
-        if (!apiUrl) {
-            // SillyTavern Internal API Fallback
-            if (typeof SillyTavern !== 'undefined' && typeof SillyTavern.getContext === 'function') {
-                const context = SillyTavern.getContext();
-                if (context && context.generate) {
-                    const displayModel = modelName || '默认模型';
-                    Logger.log(`使用 SillyTavern 内置 API (${displayModel})`);
-                    const messages = [];
-                    if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-                    messages.push({ role: 'user', content: prompt });
-                    return await context.generate(messages);
+        if (requestKey && allowDedupe && inFlightRequests.has(requestKey)) {
+            return await inFlightRequests.get(requestKey);
+        }
+
+        const executeRequest = async () => {
+            let apiUrl = apiConfig?.apiUrl || apiConfig?.url;
+            if (!modelName && apiUrl) throw new Error('模型名称不能为空');
+            const apiKey = apiConfig?.apiKey || apiConfig?.key;
+            const timeoutSec = (apiConfig?.timeout && apiConfig.timeout > 0) ? apiConfig.timeout : 60;
+            const maxRetries = Number.isInteger(apiConfig?.maxRetries) ? Math.max(0, apiConfig.maxRetries) : 2; // 默认增加重试次数
+            const baseRetryDelay = apiConfig?.retryDelayMs ?? 1000;
+            const onProgress = (typeof apiConfig?.onProgress === 'function') ? apiConfig.onProgress : null;
+            const onToken = (typeof apiConfig?.onToken === 'function') ? apiConfig.onToken : null;
+            const enableStreaming = apiConfig?.enableStreaming !== false;
+
+            const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+
+            // 智能重试判断
+            const shouldRetry = (err, status, attempt) => {
+                if (attempt >= maxRetries) return false;
+                if (err?.name === 'AbortError') return false; // 用户主动取消不重试
+
+                // 网络错误 (status === 0 或 undefined) -> 重试
+                if (!status || status === 0) return true;
+
+                // 429 Too Many Requests -> 重试
+                if (status === 429) return true;
+
+                // 5xx Server Errors -> 重试 (500, 502, 503, 504)
+                if (status >= 500) return true;
+
+                return false;
+            };
+
+            // 计算带抖动的退避时间
+            const getBackoffDelay = (attempt) => {
+                const exp = Math.pow(2, attempt);
+                const jitter = Math.random() * 0.5 + 0.5; // 0.5 ~ 1.0 jitter
+                return Math.min(baseRetryDelay * exp * jitter, 10000); // 上限 10秒
+            };
+
+            // 组合信号
+            const baseTimeoutSignal = createTimeoutSignal(timeoutSec * 1000);
+            let mergedSignal = baseTimeoutSignal;
+            if (apiConfig?.signal) {
+                if (typeof AbortSignal.any === 'function') {
+                    mergedSignal = AbortSignal.any([apiConfig.signal, baseTimeoutSignal]);
+                } else {
+                    const controller = new AbortController();
+                    const abort = () => controller.abort();
+                    apiConfig.signal.addEventListener('abort', abort, { once: true });
+                    baseTimeoutSignal.addEventListener('abort', abort, { once: true });
+                    mergedSignal = controller.signal;
                 }
             }
-            throw new Error('未配置 API 且无法获取 SillyTavern API');
-        }
 
-        // URL 规范化
-        const trimmedUrl = apiUrl.replace(/\/+$/, '');
-        let chatUrl = trimmedUrl;
-        if (!/\/(chat\/)?completions$/i.test(trimmedUrl)) {
-            if (/\/v1$/i.test(trimmedUrl)) {
-                chatUrl = `${trimmedUrl}/chat/completions`;
-            } else {
-                chatUrl = `${trimmedUrl}/v1/chat/completions`;
+            if (!apiUrl) {
+                // SillyTavern Internal API Fallback
+                if (typeof SillyTavern !== 'undefined' && typeof SillyTavern.getContext === 'function') {
+                    const context = SillyTavern.getContext();
+                    if (context && context.generate) {
+                        const displayModel = modelName || '默认模型';
+                        Logger.log(`使用 SillyTavern 内置 API (${displayModel})`);
+                        const messages = [];
+                        if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+                        messages.push({ role: 'user', content: prompt });
+                        const start = performance.now();
+                        const result = await context.generate(messages);
+                        updateEndpointStats(endpointKey, { success: true, latency: performance.now() - start });
+                        return result;
+                    }
+                }
+                throw new Error('未配置 API 且无法获取 SillyTavern API');
             }
-        }
 
-        const headers = {
-            'Content-Type': 'application/json',
-            // 'Connection': 'keep-alive' // 浏览器通常不允许手动设置此 header，改用 keepalive选项
-        };
-        if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+            // URL 规范化
+            const trimmedUrl = apiUrl.replace(/\/+$/, '');
+            let chatUrl = trimmedUrl;
+            if (!/\/(chat\/)?completions$/i.test(trimmedUrl)) {
+                if (/\/v1$/i.test(trimmedUrl)) {
+                    chatUrl = `${trimmedUrl}/chat/completions`;
+                } else {
+                    chatUrl = `${trimmedUrl}/v1/chat/completions`;
+                }
+            }
 
-        // 允许通过 apiConfig 注入额外的 headers (例如自定义 Referer 或 特殊 Auth)
-        if (apiConfig?.extraHeaders) {
-            Object.assign(headers, apiConfig.extraHeaders);
-        }
+            const headers = {
+                'Content-Type': 'application/json',
+                // 'Connection': 'keep-alive' // 浏览器通常不允许手动设置此 header，改用 keepalive选项
+            };
+            if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+            if (enableStreaming) {
+                headers['Accept'] = 'text/event-stream';
+            } else {
+                headers['Accept'] = 'application/json';
+            }
 
-        const messages = [];
-        if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-        messages.push({ role: 'user', content: prompt });
+            // 允许通过 apiConfig 注入额外的 headers (例如自定义 Referer 或 特殊 Auth)
+            if (apiConfig?.extraHeaders) {
+                Object.assign(headers, apiConfig.extraHeaders);
+            }
 
-        const body = {
-            model: modelName,
-            messages: messages,
-            max_tokens: apiConfig.maxTokens,
-            temperature: apiConfig.temperature,
-            stream: enableStreaming
-        };
-        if (apiConfig.topP !== undefined) body.top_p = apiConfig.topP;
-        if (apiConfig.presencePenalty !== undefined) body.presence_penalty = apiConfig.presencePenalty;
-        if (apiConfig.frequencyPenalty !== undefined) body.frequency_penalty = apiConfig.frequencyPenalty;
+            const messages = [];
+            if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+            messages.push({ role: 'user', content: prompt });
 
-        let attempt = 0;
-        while (true) {
-            try {
-                Logger.debug(`API Request: ${modelName} (Attempt ${attempt + 1})`);
+            const body = {
+                model: modelName,
+                messages: messages,
+                max_tokens: apiConfig.maxTokens,
+                temperature: apiConfig.temperature,
+                stream: enableStreaming
+            };
+            if (apiConfig.topP !== undefined) body.top_p = apiConfig.topP;
+            if (apiConfig.presencePenalty !== undefined) body.presence_penalty = apiConfig.presencePenalty;
+            if (apiConfig.frequencyPenalty !== undefined) body.frequency_penalty = apiConfig.frequencyPenalty;
 
-                const response = await fetch(chatUrl, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(body),
-                    signal: mergedSignal
-                    // 移除可能导致 Network Error 的严格选项 (keepalive, mode: cors等)
-                });
+            let attempt = 0;
+            while (true) {
+                try {
+                    Logger.debug(`API Request: ${modelName} (Attempt ${attempt + 1})`);
+                    const attemptStart = performance.now();
+                    const fetchOptions = {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify(body),
+                        signal: mergedSignal
+                        // 移除可能导致 Network Error 的严格选项 (keepalive, mode: cors等)
+                    };
+                    fetchOptions.priority = apiConfig?.priority || 'high';
 
-                if (!response.ok) {
-                    const errorMsg = await parseApiError(response);
-                    // 抛出带状态码的错误，以便 catch 块捕获处理
-                    const err = new Error(`HTTP ${response.status}: ${errorMsg}`);
-                    err.status = response.status;
+                    const response = await fetch(chatUrl, fetchOptions);
+                    const ttfb = performance.now() - attemptStart;
+                    recordEndpointLatency(endpointKey, ttfb);
+
+                    if (!response.ok) {
+                        const errorMsg = await parseApiError(response);
+                        // 抛出带状态码的错误，以便 catch 块捕获处理
+                        const err = new Error(`HTTP ${response.status}: ${errorMsg}`);
+                        err.status = response.status;
+                        throw err;
+                    }
+
+                    // === 成功响应处理 ===
+
+                    // 处理流式
+                    const canStream = enableStreaming && response.body && typeof response.body.getReader === 'function';
+                    if (canStream) {
+                        const content = await readStream(response.body, onToken, onProgress);
+                        updateEndpointStats(endpointKey, { success: true });
+                        return content;
+                    }
+
+                    // 处理非流式 JSON
+                    const data = await response.json();
+                    const content = parseStaticResponse(data);
+                    if (onProgress) onProgress(100);
+                    updateEndpointStats(endpointKey, { success: true });
+                    return content;
+
+                } catch (err) {
+                    const status = err.status || 0; // 0 usually means network error (fetch failed)
+
+                    if (shouldRetry(err, status, attempt)) {
+                        attempt++;
+                        const delay = getBackoffDelay(attempt);
+                        Logger.warn(`API 异常 (${status || 'Network Error'}), 重试 ${attempt}/${maxRetries} 后等待 ${Math.round(delay)}ms...`);
+                        Logger.debug(`详细错误: ${err.message}`);
+                        await sleep(delay);
+                        continue;
+                    }
+
+                    // 彻底失败
+                    if (err?.name !== 'AbortError') {
+                        updateEndpointStats(endpointKey, { success: false });
+                    }
+                    Logger.error(`API 调用最终失败: ${err.message}`);
                     throw err;
                 }
+            }
+        };
 
-                // === 成功响应处理 ===
+        const requestPromise = executeRequest();
+        if (requestKey && allowDedupe) {
+            inFlightRequests.set(requestKey, requestPromise);
+        }
 
-                // 处理流式
-                const canStream = enableStreaming && response.body && typeof response.body.getReader === 'function';
-                if (canStream) {
-                    const content = await readStream(response.body, onToken, onProgress);
-                    return content;
-                }
-
-                // 处理非流式 JSON
-                const data = await response.json();
-                const content = parseStaticResponse(data);
-                if (onProgress) onProgress(100);
-                return content;
-
-            } catch (err) {
-                const status = err.status || 0; // 0 usually means network error (fetch failed)
-
-                if (shouldRetry(err, status, attempt)) {
-                    attempt++;
-                    const delay = getBackoffDelay(attempt);
-                    Logger.warn(`API 异常 (${status || 'Network Error'}), 重试 ${attempt}/${maxRetries} 后等待 ${Math.round(delay)}ms...`);
-                    Logger.debug(`详细错误: ${err.message}`);
-                    await sleep(delay);
-                    continue;
-                }
-
-                // 彻底失败
-                Logger.error(`API 调用最终失败: ${err.message}`);
-                throw err;
+        try {
+            const result = await requestPromise;
+            if (requestKey && useCache) {
+                setCachedResponse(requestKey, result);
+            }
+            return result;
+        } finally {
+            if (requestKey && allowDedupe) {
+                inFlightRequests.delete(requestKey);
             }
         }
     }
@@ -426,6 +499,10 @@
                 const host = new URL(url).origin;
                 if (preconnectedHosts.has(host)) return;
                 preconnectedHosts.add(host);
+                const dnsPrefetch = document.createElement('link');
+                dnsPrefetch.rel = 'dns-prefetch';
+                dnsPrefetch.href = host;
+                document.head.appendChild(dnsPrefetch);
                 const link = document.createElement('link');
                 link.rel = 'preconnect';
                 link.href = host;
@@ -438,7 +515,66 @@
 
     // ========== 延迟测量 (Latency Measurement) ==========
     const latencyScores = new Map(); // endpointId -> { latency, timestamp }
+    const endpointStats = new Map(); // endpointId -> stats
     const LATENCY_TTL = 5 * 60 * 1000; // 5 minutes
+    const FAILURE_PENALTY_WINDOW = 2 * 60 * 1000; // 2 minutes
+    const FAILURE_PENALTY_STEP = 1500;
+    const MAX_FAILURE_PENALTY = 5;
+
+    function updateEndpointStats(endpointId, { success = false, latency } = {}) {
+        if (!endpointId) return;
+        const now = Date.now();
+        const stats = endpointStats.get(endpointId) || {
+            successes: 0,
+            failures: 0,
+            consecutiveFailures: 0,
+            avgLatency: 0,
+            lastLatency: 0,
+            lastSuccess: 0,
+            lastFailure: 0
+        };
+
+        if (Number.isFinite(latency) && latency > 0) {
+            stats.lastLatency = latency;
+            stats.avgLatency = stats.avgLatency > 0
+                ? (stats.avgLatency * 0.8 + latency * 0.2)
+                : latency;
+        }
+
+        if (success) {
+            stats.successes += 1;
+            stats.consecutiveFailures = 0;
+            stats.lastSuccess = now;
+        } else {
+            stats.failures += 1;
+            stats.consecutiveFailures = Math.min(10, (stats.consecutiveFailures || 0) + 1);
+            stats.lastFailure = now;
+        }
+
+        endpointStats.set(endpointId, stats);
+    }
+
+    function recordEndpointLatency(endpointId, latency) {
+        if (!endpointId || !Number.isFinite(latency) || latency <= 0) return;
+        latencyScores.set(endpointId, { latency, timestamp: Date.now() });
+        const stats = endpointStats.get(endpointId) || {
+            successes: 0,
+            failures: 0,
+            consecutiveFailures: 0,
+            avgLatency: 0,
+            lastLatency: 0,
+            lastSuccess: 0,
+            lastFailure: 0
+        };
+        const next = {
+            ...stats,
+            lastLatency: latency,
+            avgLatency: stats.avgLatency > 0
+                ? (stats.avgLatency * 0.8 + latency * 0.2)
+                : latency
+        };
+        endpointStats.set(endpointId, next);
+    }
 
     async function measureLatency(endpoint) {
         const url = endpoint.apiUrl || endpoint.url;
@@ -460,7 +596,7 @@
             });
             const latency = performance.now() - start;
             if (res.ok) {
-                latencyScores.set(endpoint.id, { latency, timestamp: Date.now() });
+                recordEndpointLatency(endpoint.id, latency);
                 Logger.log(`端点 ${endpoint.name || endpoint.id} 延迟: ${latency.toFixed(0)}ms`);
                 return latency;
             }
@@ -478,8 +614,31 @@
         return record.latency;
     }
 
+    function getEndpointStats(endpointId) {
+        return endpointStats.get(endpointId) || null;
+    }
+
+    function getEndpointScore(endpoint) {
+        if (!endpoint) return Infinity;
+        const endpointId = endpoint.id;
+        const stats = endpointId ? endpointStats.get(endpointId) : null;
+        const measuredLatency = endpointId ? getEndpointLatency(endpointId) : Infinity;
+        const statsLatency = stats?.avgLatency || stats?.lastLatency || Infinity;
+        let baseLatency = Number.isFinite(measuredLatency) ? measuredLatency : statsLatency;
+        if (!Number.isFinite(baseLatency)) baseLatency = 5000;
+
+        let penalty = 0;
+        if (stats?.consecutiveFailures) {
+            penalty += Math.min(MAX_FAILURE_PENALTY, stats.consecutiveFailures) * FAILURE_PENALTY_STEP;
+        }
+        if (stats?.lastFailure && Date.now() - stats.lastFailure < FAILURE_PENALTY_WINDOW) {
+            penalty += FAILURE_PENALTY_STEP;
+        }
+        return baseLatency + penalty;
+    }
+
     function sortEndpointsByLatency(endpoints) {
-        return [...endpoints].sort((a, b) => getEndpointLatency(a.id) - getEndpointLatency(b.id));
+        return [...endpoints].sort((a, b) => getEndpointScore(a) - getEndpointScore(b));
     }
 
     async function refreshAllLatencies(endpoints) {
@@ -492,8 +651,8 @@
     const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
     const CACHE_MAX_SIZE = 50;
 
-    function computeCacheKey(modelName, systemPrompt, userPrompt) {
-        const str = `${modelName}||${systemPrompt}||${userPrompt}`;
+    function computeCacheKey(modelName, systemPrompt, userPrompt, endpointKey = '') {
+        const str = `${endpointKey}||${modelName}||${systemPrompt}||${userPrompt}`;
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
             const char = str.charCodeAt(i);
@@ -503,10 +662,10 @@
         return hash.toString(36);
     }
 
-    function getCachedResponse(key) {
+    function getCachedResponse(key, ttlMs = CACHE_TTL) {
         const entry = responseCache.get(key);
         if (!entry) return null;
-        if (Date.now() - entry.timestamp > CACHE_TTL) {
+        if (Date.now() - entry.timestamp > ttlMs) {
             responseCache.delete(key);
             return null;
         }
@@ -538,6 +697,8 @@
     window.WBAP.setupPreconnect = setupPreconnect;
     window.WBAP.measureLatency = measureLatency;
     window.WBAP.getEndpointLatency = getEndpointLatency;
+    window.WBAP.getEndpointStats = getEndpointStats;
+    window.WBAP.getEndpointScore = getEndpointScore;
     window.WBAP.sortEndpointsByLatency = sortEndpointsByLatency;
     window.WBAP.refreshAllLatencies = refreshAllLatencies;
     window.WBAP.computeCacheKey = computeCacheKey;

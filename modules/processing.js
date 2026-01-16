@@ -91,6 +91,20 @@
         return text.split(placeholder).join(value ?? '');
     }
 
+    function getSelectedWorldBooksFromUI() {
+        const select = document.getElementById('world_info') || document.getElementById('character_world');
+        if (!select) return [];
+        const options = select.selectedOptions ? Array.from(select.selectedOptions) : [];
+        const names = options.map(opt => (opt.textContent || opt.value || '').trim());
+        if (!select.multiple && names.length === 0 && select.value) {
+            names.push(String(select.value).trim());
+        }
+        return names.filter(name => {
+            const normalized = (name || '').toLowerCase().replace(/[\s—-]/g, '');
+            return normalized !== '' && normalized !== 'none' && normalized !== '—none—';
+        });
+    }
+
     function splitTextIntoChunks(text, chunkSize = 4000) {
         const paragraphs = text.split(/\n\s*\n/);
         const chunks = [];
@@ -273,13 +287,17 @@
             }
 
             const tasksByBook = {};
+            const fallbackWorldBooks = !bookName ? getSelectedWorldBooksFromUI() : [];
             for (const endpoint of endpointsToProcess) {
                 const worldBooks = Array.isArray(endpoint.worldBooks)
                     ? endpoint.worldBooks
                     : (endpoint.worldBook ? [endpoint.worldBook] : []);
+                const effectiveBooks = worldBooks.length > 0
+                    ? worldBooks
+                    : (bookName ? [bookName] : fallbackWorldBooks);
                 const entriesMap = endpoint.assignedEntriesMap || {};
                 const legacyEntries = Array.isArray(endpoint.assignedEntries) ? endpoint.assignedEntries : [];
-                worldBooks.forEach(wb => {
+                effectiveBooks.forEach(wb => {
                     const assigned = entriesMap[wb] || legacyEntries;
                     if (!tasksByBook[wb]) tasksByBook[wb] = [];
                     tasksByBook[wb].push({ endpoint, assigned });
@@ -355,12 +373,12 @@
                             columnBlocks.push(`[${name}]\n${info.entry.content || ''}`);
                         });
                         content = columnBlocks.join('\n\n');
-                    } else if (entryIds.length === 0) {
-                        // Non-table and nothing selected: skip execution
-                        continue;
                     }
 
                     if (!tableLike) {
+                        if (entryIds.length === 0) {
+                            entryIds = enabledEntries.map(([uid]) => uid);
+                        }
                         entryIds.forEach(entryId => {
                             const entry = book.entries[entryId];
                             if (entry && entry.disable !== true) {
@@ -391,7 +409,7 @@
             }
 
             if (baseTasks.length === 0) {
-                Logger.log('No executable tasks found.');
+                Logger.log('No executable tasks found. 请检查 API 实例是否选择了世界书/条目。');
                 return null;
             }
 

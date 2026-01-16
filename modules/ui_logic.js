@@ -10,6 +10,68 @@
     let panelElement = null;
     let settingsElement = null;
 
+    function ensureProgressPanel(templates) {
+        const existing = document.getElementById('wbap-progress-panel');
+        if (existing) {
+            const hasBar = existing.querySelector('#wbap-progress-bar');
+            const hasStatus = existing.querySelector('#wbap-progress-status');
+            const hasTimer = existing.querySelector('#wbap-progress-timer');
+            if (hasBar && hasStatus && hasTimer) {
+                return { element: existing, created: false };
+            }
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = templates.PROGRESS_PANEL_HTML;
+            const fresh = wrapper.firstElementChild;
+            existing.replaceWith(fresh);
+            return { element: fresh, created: true };
+        }
+
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = templates.PROGRESS_PANEL_HTML;
+        document.body.appendChild(wrapper.firstElementChild);
+        return { element: document.getElementById('wbap-progress-panel'), created: true };
+    }
+
+    function ensureFloatButton() {
+        if (document.getElementById('wbap-float-btn')) return;
+
+        const floatBtn = document.createElement('button');
+        floatBtn.id = 'wbap-float-btn';
+        floatBtn.className = 'wbap-fab'; // 使用CSS类
+        floatBtn.innerHTML = '<i class="fa-solid fa-cat"></i>';
+        floatBtn.title = '笔者之脑';
+        document.body.appendChild(floatBtn);
+
+        const savedPosition = localStorage.getItem('wbap_float_ball_position');
+        if (savedPosition) {
+            try {
+                const pos = JSON.parse(savedPosition);
+                floatBtn.style.top = pos.top;
+                floatBtn.style.left = pos.left;
+            } catch (e) {
+                floatBtn.style.top = '';
+                floatBtn.style.left = '';
+            }
+        }
+
+        const onClick = () => {
+            if (panelElement) {
+                document.body.classList.remove('wbap-mobile-settings-mode');
+                document.documentElement.classList.remove('wbap-mobile-settings-mode');
+                if (settingsElement) settingsElement.classList.remove('open');
+
+                panelElement.classList.toggle('open');
+                syncMobileRootFix();
+            }
+        };
+        const onDragEnd = (pos) => {
+            localStorage.setItem('wbap_float_ball_position', JSON.stringify(pos));
+        };
+
+        WBAP.makeDraggable(floatBtn, onClick, onDragEnd);
+        Logger.log('悬浮按钮已注入');
+    }
+
     function syncMobileRootFix() {
         try {
             const anyOverlayOpen = !!document.querySelector('.wbap-panel.open, .wbap-settings.open, .wbap-modal.open, #wbap-entry-modal.open');
@@ -27,133 +89,28 @@
         try {
             Logger.log('开始注入 UI');
 
+            const templates = WBAP.UI_TEMPLATES;
+            if (!templates) {
+                Logger.error('UI 模板不可用，无法注入。');
+                return;
+            }
+
             if (document.getElementById('wbap-panel')) {
-                Logger.log('UI 已存在，跳过注入');
+                panelElement = document.getElementById('wbap-panel');
+                settingsElement = document.getElementById('wbap-settings');
+                ensureFloatButton();
+
+                const progress = ensureProgressPanel(templates);
+                if (progress.created) bindProgressPanelEvents();
+
+                Logger.log('UI 已存在，已补齐缺失组件');
                 return;
             }
 
             // 注入悬浮按钮
-            const floatBtn = document.createElement('button');
-            floatBtn.id = 'wbap-float-btn';
-            floatBtn.className = 'wbap-fab'; // 使用CSS类
-            floatBtn.innerHTML = '<i class="fa-solid fa-cat"></i>';
-            floatBtn.title = '笔者之脑';
-            document.body.appendChild(floatBtn);
-
-            // 恢复位置
-            const savedPosition = localStorage.getItem('wbap_float_ball_position');
-            if (savedPosition) {
-                try {
-                    const pos = JSON.parse(savedPosition);
-                    floatBtn.style.top = pos.top;
-                    floatBtn.style.left = pos.left;
-                } catch (e) {
-                    // fallback 如解析失败, CSS会处理默认位置
-                    floatBtn.style.top = '';
-                    floatBtn.style.left = '';
-                }
-            }
-
-            // Make the button draggable using the generic utility
-            const onClick = () => {
-                if (panelElement) {
-                    // RESET TRAP: Force clear settings mode to prevent UI lockup
-                    document.body.classList.remove('wbap-mobile-settings-mode');
-                    document.documentElement.classList.remove('wbap-mobile-settings-mode');
-                    if (settingsElement) settingsElement.classList.remove('open');
-
-                    panelElement.classList.toggle('open');
-                    syncMobileRootFix();
-                }
-            };
-            const onDragEnd = (pos) => {
-                localStorage.setItem('wbap_float_ball_position', JSON.stringify(pos));
-            };
-
-            WBAP.makeDraggable(floatBtn, onClick, onDragEnd);
-            Logger.log('悬浮按钮已注入');
+            ensureFloatButton();
 
             // 注入模板
-            const templates = WBAP.UI_TEMPLATES;
-            const panelDiv = document.createElement('div');
-            panelDiv.innerHTML = templates.PANEL_HTML;
-            document.body.appendChild(panelDiv.firstElementChild);
-            panelElement = document.getElementById('wbap-panel');
-
-            const settingsDiv = document.createElement('div');
-            settingsDiv.innerHTML = templates.SETTINGS_HTML;
-            document.body.appendChild(settingsDiv.firstElementChild);
-            settingsElement = document.getElementById('wbap-settings');
-            if (settingsElement) {
-                Logger.log('设置元素 #wbap-settings 已成功注入和获取。');
-            } else {
-                Logger.error('错误：无法获取 #wbap-settings 元素。');
-            }
-
-            const editorDiv = document.createElement('div');
-            editorDiv.innerHTML = templates.PROMPT_EDITOR_HTML;
-            const shouldLockMobileRoot = window.innerWidth <= 900 && anyOverlayOpen;
-            document.body.classList.toggle('wbap-mobile-root-fix', shouldLockMobileRoot);
-            document.documentElement.classList.toggle('wbap-mobile-root-fix', shouldLockMobileRoot);
-            document.body.classList.toggle('wbap-overlay-open', anyOverlayOpen);
-            document.documentElement.classList.toggle('wbap-overlay-open', anyOverlayOpen);
-        } catch (e) {
-            // non-critical
-        }
-    }
-
-    function injectUI() {
-        try {
-            Logger.log('开始注入 UI');
-
-            if (document.getElementById('wbap-panel')) {
-                Logger.log('UI 已存在，跳过注入');
-                return;
-            }
-
-            // 注入悬浮按钮
-            const floatBtn = document.createElement('button');
-            floatBtn.id = 'wbap-float-btn';
-            floatBtn.className = 'wbap-fab'; // 使用CSS类
-            floatBtn.innerHTML = '<i class="fa-solid fa-cat"></i>';
-            floatBtn.title = '笔者之脑';
-            document.body.appendChild(floatBtn);
-
-            // 恢复位置
-            const savedPosition = localStorage.getItem('wbap_float_ball_position');
-            if (savedPosition) {
-                try {
-                    const pos = JSON.parse(savedPosition);
-                    floatBtn.style.top = pos.top;
-                    floatBtn.style.left = pos.left;
-                } catch (e) {
-                    // fallback 如解析失败, CSS会处理默认位置
-                    floatBtn.style.top = '';
-                    floatBtn.style.left = '';
-                }
-            }
-
-            // Make the button draggable using the generic utility
-            const onClick = () => {
-                if (panelElement) {
-                    // RESET TRAP: Force clear settings mode to prevent UI lockup
-                    document.body.classList.remove('wbap-mobile-settings-mode');
-                    document.documentElement.classList.remove('wbap-mobile-settings-mode');
-                    if (settingsElement) settingsElement.classList.remove('open');
-
-                    panelElement.classList.toggle('open');
-                    syncMobileRootFix();
-                }
-            };
-            const onDragEnd = (pos) => {
-                localStorage.setItem('wbap_float_ball_position', JSON.stringify(pos));
-            };
-
-            WBAP.makeDraggable(floatBtn, onClick, onDragEnd);
-            Logger.log('悬浮按钮已注入');
-
-            // 注入模板
-            const templates = WBAP.UI_TEMPLATES;
             const panelDiv = document.createElement('div');
             panelDiv.innerHTML = templates.PANEL_HTML;
             document.body.appendChild(panelDiv.firstElementChild);
@@ -181,9 +138,7 @@
             endpointEditorDiv.innerHTML = templates.API_ENDPOINT_EDITOR_HTML;
             document.body.appendChild(endpointEditorDiv.firstElementChild);
 
-            const progressDiv = document.createElement('div');
-            progressDiv.innerHTML = templates.PROGRESS_PANEL_HTML;
-            document.body.appendChild(progressDiv.firstElementChild);
+            ensureProgressPanel(templates);
 
             // 绑定事件并刷新
             bindPanelEvents();
@@ -438,6 +393,7 @@
                 retryDelayMs: 800,
                 timeout: 60,
                 enabled: true,
+                dedupe: true,
                 worldBooks: [],
                 assignedEntriesMap: {}
             });
@@ -1678,6 +1634,7 @@
     function bindProgressPanelEvents() {
         const panel = document.getElementById('wbap-progress-panel');
         if (panel) {
+            if (panel.getAttribute('data-wbap-bound') === 'true') return;
             // Make the entire panel draggable
             makeElementDraggable(panel);
 
@@ -1692,6 +1649,7 @@
             if (closeBtn) {
                 closeBtn.addEventListener('click', hideProgressPanel);
             }
+            panel.setAttribute('data-wbap-bound', 'true');
         }
     }
 
@@ -1819,6 +1777,9 @@
         if (endpoint.retryDelayMs == null) endpoint.retryDelayMs = 800;
         if (endpoint.enabled === undefined) {
             endpoint.enabled = true;
+        }
+        if (endpoint.dedupe === undefined) {
+            endpoint.dedupe = true;
         }
         if (!endpoint.assignedEntriesMap) {
             endpoint.assignedEntriesMap = {};
@@ -2192,6 +2153,7 @@
                 retryDelayMs: 800,
                 timeout: WBAP.mainConfig?.globalSettings?.timeout || 60,
                 enabled: true,
+                dedupe: true,
                 worldBooks: [],
                 assignedEntriesMap: {}
             };
@@ -2208,6 +2170,10 @@
         const enabledInput = document.getElementById('wbap-endpoint-edit-enabled');
         if (enabledInput) {
             enabledInput.checked = endpoint.enabled !== false;
+        }
+        const dedupeInput = document.getElementById('wbap-endpoint-edit-dedupe');
+        if (dedupeInput) {
+            dedupeInput.checked = endpoint.dedupe !== false;
         }
         // 兼容旧字段 url/key
         document.getElementById('wbap-endpoint-edit-url').value = endpoint.apiUrl || endpoint.url || '';
@@ -2291,6 +2257,7 @@
         endpoint.retryDelayMs = parseInt(document.getElementById('wbap-endpoint-edit-retry-delay').value, 10);
         if (isNaN(endpoint.retryDelayMs)) endpoint.retryDelayMs = 800;
         endpoint.enabled = document.getElementById('wbap-endpoint-edit-enabled')?.checked !== false;
+        endpoint.dedupe = document.getElementById('wbap-endpoint-edit-dedupe')?.checked !== false;
 
         // The assignedEntriesMap is now updated live by a 'change' listener,
         // so we just need to ensure the worldBooks array is clean.

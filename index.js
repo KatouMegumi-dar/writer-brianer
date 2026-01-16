@@ -81,7 +81,6 @@
     const SCRIPTS_TO_LOAD = [
         'character_manager.js', // 必须最先加载
         'config.js',
-        'stream_utils.js', // NEW: 流式处理工具
         'ui_templates.js',
         'api.js',
         'prompt_manager.js',

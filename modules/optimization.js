@@ -35,7 +35,6 @@
         availableModels: [],
         // 取消和重新生成
         abortController: null,
-        lastUserInput: '',
         // Level3 三级优化模式
         mode: 'manual',           // 'manual' | 'level3'
         level3Context: null,      // 三级优化上下文 { inputText, originalInput, worldbookContent }
@@ -361,26 +360,29 @@
         }
     }
 
+    async function ensureWorldEntries(worldName) {
+        if (!worldName) return {};
+        if (state.worldSelection.cache.has(worldName)) {
+            return state.worldSelection.cache.get(worldName) || {};
+        }
+        try {
+            const book = await WBAP.loadWorldBookEntriesByName?.(worldName);
+            const entries = (book && book.entries) ? book.entries : {};
+            state.worldSelection.cache.set(worldName, entries);
+            return entries;
+        } catch (e) {
+            Logger.warn('获取世界书条目失败', e);
+            state.worldSelection.cache.set(worldName, {});
+            return {};
+        }
+    }
+
     async function loadWorldEntries(worldName) {
         if (!worldName) {
             renderEntryList(null);
             return;
         }
-        if (state.worldSelection.cache.has(worldName)) {
-            renderEntryList(worldName);
-            return;
-        }
-        try {
-            const book = await WBAP.loadWorldBookEntriesByName?.(worldName);
-            if (book && book.entries) {
-                state.worldSelection.cache.set(worldName, book.entries);
-            } else {
-                state.worldSelection.cache.set(worldName, {});
-            }
-        } catch (e) {
-            Logger.warn('获取世界书条目失败', e);
-            state.worldSelection.cache.set(worldName, {});
-        }
+        await ensureWorldEntries(worldName);
         renderEntryList(worldName);
     }
 
@@ -764,7 +766,6 @@
         if (!userText) return;
 
         // 保存最后一次输入用于重新生成
-        state.lastUserInput = userText;
 
         if (!textOverride) {
             appendMessage('user', userText);
@@ -784,10 +785,11 @@
 
             const preset = getSelectedOptimizationPromptPreset();
             const systemPrompt = (preset.systemPrompt || '').trim() || DEFAULT_SYSTEM_PROMPT;
-            const prompt = buildOptimizationPrompt(userText, worldbookContent);
+            const prompt = buildOptimizationPrompt(userText, worldbookContent, preset.promptTemplate);
 
             // 带取消信号的API调用
-            const result = await WBAP.callAI(model, prompt, systemPrompt, apiConfig, {
+            const result = await WBAP.callAI(model, prompt, systemPrompt, {
+                ...apiConfig,
                 signal: state.abortController.signal
             });
             appendMessage('ai', result?.trim() || '（未返回内容）');
@@ -849,12 +851,41 @@
         renderMessages();
     }
 
-    function buildOptimizationPrompt(userText, worldbookContent) {
+    function replaceToken(text, token, value) {
+        return String(text || '').split(token).join(value ?? '');
+    }
+
+    function buildOptimizationPrompt(userText, worldbookContent, promptTemplate = '') {
         const history = state.messages
             .slice(-6)
             .map(m => `${m.role === 'user' ? '用户' : '助手'}：${m.content}`)
             .join('\n');
-        const worldPart = worldbookContent ? `\n【世界书摘录】\n${worldbookContent}` : '';
+        const hasHistory = !!history;
+        const hasWorldbook = !!worldbookContent;
+        const template = (promptTemplate || '').trim();
+
+        if (template) {
+            const includesHistory = template.includes('{history}');
+            const includesInput = template.includes('{input}');
+            const includesWorldbook = template.includes('{worldbook}');
+            let output = template;
+            output = replaceToken(output, '{history}', history || '');
+            output = replaceToken(output, '{input}', userText);
+            output = replaceToken(output, '{worldbook}', worldbookContent || '');
+
+            if (!includesHistory && hasHistory) {
+                output = ['【已知对话】', history, '', output].join('\n');
+            }
+            if (!includesInput) {
+                output += `\n\n${userText}`;
+            }
+            if (!includesWorldbook && hasWorldbook) {
+                output += `\n\n【世界书摘录】\n${worldbookContent}`;
+            }
+            return output;
+        }
+
+        const worldPart = hasWorldbook ? `\n【世界书摘录】\n${worldbookContent}` : '';
         return [
             '【已知对话】',
             history || '（无历史）',
@@ -869,20 +900,24 @@
 
     async function buildSelectedWorldbookContent() {
         if (state.worldSelection.selected.size === 0) return '';
-        let combined = '';
-        for (const world of state.worldSelection.selected) {
-            const book = await WBAP.loadWorldBookEntriesByName?.(world);
-            if (!book || !book.entries) continue;
+        const worlds = Array.from(state.worldSelection.selected);
+        const entrySets = await Promise.all(worlds.map(async world => ({
+            world,
+            entries: await ensureWorldEntries(world)
+        })));
+
+        const blocks = entrySets.map(({ world, entries }) => {
             const selectedEntries = state.worldSelection.entriesByWorld.get(world);
-            const entries = Object.entries(book.entries).filter(([, e]) => e && e.disable !== true);
+            const enabledEntries = Object.entries(entries || {}).filter(([, e]) => e && e.disable !== true);
             const filtered = (selectedEntries && selectedEntries.size > 0)
-                ? entries.filter(([id]) => selectedEntries.has(id))
-                : entries;
-            if (filtered.length === 0) continue;
+                ? enabledEntries.filter(([id]) => selectedEntries.has(id))
+                : enabledEntries;
+            if (filtered.length === 0) return '';
             const block = filtered.map(([id, entry]) => `[${entry.comment || id}]\n${entry.content || ''}`).join('\n\n');
-            combined += `【${world}】\n${block}\n\n`;
-        }
-        return combined.trim();
+            return `【${world}】\n${block}`;
+        }).filter(Boolean);
+
+        return blocks.join('\n\n').trim();
     }
 
     function resolveApiConfig() {

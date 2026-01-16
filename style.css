@@ -61,10 +61,6 @@
 /* ============================================================================
    [2] 基础样式
    ============================================================================ */
-.wbap-hidden {
-    display: none !important;
-}
-
 /* 防止页面滚动 */
 body.wbap-overlay-open,
 html.wbap-overlay-open {
@@ -980,155 +976,6 @@ html.wbap-overlay-open {
     }
 }
 
-/* ============================================================================
-   [31] 进度条面板 (Progress Panel)
-   ============================================================================ */
-.wbap-progress-panel {
-    position: fixed;
-    top: 15vh;
-    left: 0;
-    right: 0;
-    margin: 0 auto;
-    z-index: 2147483645;
-    /* Above other panels */
-    background-color: var(--wbap-bg-panel);
-    border: 1px solid var(--wbap-border-color);
-    border-radius: var(--wbap-border-radius-lg);
-    box-shadow: var(--wbap-shadow-lg);
-    width: 90%;
-    max-width: 400px;
-    height: fit-content;
-    max-height: 80vh;
-    padding: 24px;
-    -webkit-backdrop-filter: blur(12px);
-    backdrop-filter: blur(12px);
-
-    /* Allow resizing down to ~1/3 of default size */
-    min-width: 130px;
-    min-height: 80px;
-    overflow: hidden;
-    /* Prevent content overflow at small sizes */
-
-    /* Initially hidden */
-    display: none;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.wbap-resize-handle {
-    width: 20px;
-    height: 20px;
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    cursor: nwse-resize;
-    z-index: 10;
-    /* Visual indicator (corner triangle) */
-    background: linear-gradient(135deg, transparent 50%, var(--wbap-border-color-light) 50%);
-    border-bottom-right-radius: var(--wbap-border-radius-lg);
-    opacity: 0.7;
-    transition: opacity 0.2s;
-    touch-action: none;
-    /* Prevent scroll on mobile */
-}
-
-.wbap-resize-handle:hover,
-.wbap-resize-handle:active {
-    opacity: 1;
-    background: linear-gradient(135deg, transparent 50%, var(--wbap-primary) 50%);
-}
-
-.wbap-progress-panel.open {
-    display: block;
-    opacity: 1;
-    animation: fadeIn 0.3s forwards;
-}
-
-.wbap-progress-close {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: transparent;
-    border: none;
-    color: var(--wbap-text-muted);
-    font-size: 20px;
-    line-height: 1;
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 50%;
-    z-index: 20;
-    transition: all 0.2s;
-}
-
-.wbap-progress-close:hover {
-    color: var(--wbap-text);
-    background-color: var(--wbap-bg-element-hover);
-    transform: rotate(90deg);
-}
-
-.wbap-progress-content {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    text-align: center;
-}
-
-.wbap-progress-content h4 {
-    margin: 0;
-    font-size: 18px;
-    color: var(--wbap-text);
-    font-weight: 600;
-}
-
-.wbap-progress-bar-container {
-    width: 100%;
-    height: 8px;
-    background-color: var(--wbap-bg-input);
-    border-radius: 4px;
-    overflow: hidden;
-    position: relative;
-    border: 1px solid var(--wbap-border-color-light);
-}
-
-.wbap-progress-bar {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, var(--wbap-primary), var(--wbap-accent));
-    border-radius: 4px;
-    transition: width 0.3s ease-out;
-    box-shadow: 0 0 10px rgba(100, 100, 255, 0.5);
-}
-
-/* 进度条动画效果 */
-.wbap-progress-bar.animated {
-    background-size: 200% 100%;
-    animation: gradientMove 1.5s linear infinite;
-}
-
-@keyframes gradientMove {
-    0% {
-        background-position: 100% 0;
-    }
-
-    100% {
-        background-position: -100% 0;
-    }
-}
-
-.wbap-progress-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 13px;
-    color: var(--wbap-text-secondary);
-}
-
-#wbap-progress-timer {
-    font-family: var(--wbap-font-mono);
-    color: var(--wbap-primary-light);
-    font-weight: bold;
-}
-
 /* Mobile Optimization for Plot Panel */
 @media (max-width: 768px) {
     #wbap-optimization-panel .wbap-panel-container {
@@ -1384,56 +1231,16 @@ html.wbap-overlay-open {
 
 
 
-/* Enhanced Progress Bar Styles */
-.wbap-progress-bar-container {
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 6px;
-    height: 14px;
-    overflow: hidden;
-    position: relative;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
-    margin: 8px 0;
-}
-
-#wbap-progress-bar {
-    height: 100%;
-    background: linear-gradient(90deg, var(--wbap-primary, #007bff) 0%, #00c6ff 100%);
-    width: 0%;
-    transition: width 0.3s ease-out;
-    position: relative;
-    box-shadow: 0 0 8px rgba(0, 123, 255, 0.5);
-}
-
-#wbap-progress-bar.animated {
-    background-size: 30px 30px;
-    background-image: linear-gradient(45deg,
-            rgba(255, 255, 255, 0.15) 25%,
-            transparent 25%,
-            transparent 50%,
-            rgba(255, 255, 255, 0.15) 50%,
-            rgba(255, 255, 255, 0.15) 75%,
-            transparent 75%,
-            transparent);
-    animation: wbap-progress-stripes 1s linear infinite;
-}
-
-@keyframes wbap-progress-stripes {
-    0% {
-        background-position: 30px 0;
-    }
-
-    100% {
-        background-position: 0 0;
-    }
-}
-
-
 /* ========== Progress Panel Premium Styles ========== */
 .wbap-progress-panel {
     position: fixed;
     top: 20px;
     right: 20px;
     width: 320px;
+    max-width: 90vw;
+    max-height: 80vh;
+    min-width: 160px;
+    min-height: 80px;
     background: rgba(30, 30, 40, 0.85);
     /* 深色半透明背景 */
     backdrop-filter: blur(12px);
@@ -1441,7 +1248,7 @@ html.wbap-overlay-open {
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    z-index: 9999;
+    z-index: 2147483645;
     color: #e0e0e0;
     font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -1593,10 +1400,6 @@ html.wbap-overlay-open {
 }
 
 /* === Optimization Panel Revamp (WeChat Style Fixed) === */
-.wbap-hidden {
-    display: none !important;
-}
-
 /* Overlay Background */
 .wbap-opt-panel-root {
     position: fixed;

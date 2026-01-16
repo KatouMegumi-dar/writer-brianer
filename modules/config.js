@@ -64,6 +64,7 @@
                         retryDelayMs: 800,
                         timeout: 60,
                         enabled: true,
+                        dedupe: true,
                         worldBooks: [],
                         assignedEntriesMap: {}
                     }
@@ -137,6 +138,7 @@
                 }
             }
             if (ep.enabled === undefined) ep.enabled = true;
+            if (ep.dedupe === undefined) ep.dedupe = true;
             if (!ep.id || seenIds.has(ep.id)) {
                 ep.id = generateEndpointId();
             }

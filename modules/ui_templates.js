@@ -35,6 +35,7 @@
                 <div class="wbap-prompt-actions-toolbar">
                     <button id="wbap-prompt-new-btn" class="wbap-btn wbap-btn-xs" title="新建"><i class="fa-solid fa-plus"></i> 新建</button>
                     <button id="wbap-import-prompt-btn" class="wbap-btn wbap-btn-xs" title="导入"><i class="fa-solid fa-download"></i> 导入</button>
+                    <button id="wbap-open-prompt-picker" class="wbap-btn wbap-btn-xs" title="快速选择"><i class="fa-solid fa-list-check"></i> 选择</button>
                     <button id="wbap-prompt-edit-btn" class="wbap-btn wbap-btn-xs" title="编辑"><i class="fa-solid fa-pencil"></i> 编辑</button>
                     <button id="wbap-prompt-export-btn" class="wbap-btn wbap-btn-xs" title="导出"><i class="fa-solid fa-upload"></i> 导出</button>
                     <button id="wbap-prompt-delete-btn" class="wbap-btn wbap-btn-xs wbap-btn-danger" title="删除"><i class="fa-solid fa-trash"></i> 删除</button>
@@ -431,6 +432,12 @@
                     </label>
                 </div>
                 <div class="wbap-form-group">
+                    <label>
+                        <input type="checkbox" id="wbap-endpoint-edit-dedupe" checked>
+                        启用并发去重（相同请求合并）
+                    </label>
+                </div>
+                <div class="wbap-form-group">
                     <label>API URL</label>
                     <input type="text" id="wbap-endpoint-edit-url" placeholder="https://api.deepseek.com/v1">
                 </div>
@@ -561,6 +568,12 @@
     <div class="wbap-progress-content">
         <h4 id="wbap-progress-title">正在思考...</h4>
         <div class="wbap-progress-bar-container">
+            <div id="wbap-progress-bar" class="wbap-progress-bar"></div>
+        </div>
+        <div class="wbap-progress-info">
+            <span id="wbap-progress-status">0%</span>
+            <span id="wbap-progress-timer">00:00</span>
+        </div>
     </div>
     <div class="wbap-resize-handle" id="wbap-progress-resize-handle"></div>
 </div>
