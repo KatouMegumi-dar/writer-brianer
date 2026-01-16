@@ -775,6 +775,9 @@
         renderAggregatorControls();
         refreshPromptList();
         refreshSecondaryPromptUI();
+        if (WBAP.Optimization && typeof WBAP.Optimization.updateFloatingButtonVisibility === 'function') {
+            WBAP.Optimization.updateFloatingButtonVisibility();
+        }
     }
 
     function renderApiEndpoints() {

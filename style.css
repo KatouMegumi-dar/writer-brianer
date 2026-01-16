@@ -1858,585 +1858,377 @@ html.wbap-overlay-open {
     line-height: 1.6;
 }
 
-/* Popover Refactor */
-.wbap-popover {
-    bottom: 120px;
-    /* Above footer */
-    left: 20px;
-    width: 280px;
-    background-color: var(--wbap-bg-element);
-    border: 1px solid var(--wbap-border-color);
-    border-radius: var(--wbap-border-radius-md);
-    box-shadow: var(--wbap-shadow-lg);
-    z-index: 2147483645;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    max-height: 300px;
-    position: absolute; /* Positioned container to anchor close button */
-}
-
-.wbap-popover-header {
-    background-color: var(--wbap-bg-secondary);
-    padding: 8px 12px;
-    font-size: 13px;
-    font-weight: 600;
-    border-bottom: 1px solid var(--wbap-border-color);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-}
-
-.wbap-popover-close {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 28px;
-    height: 28px;
-    border: none;
-    border-radius: 4px;
-    background: rgba(255,255,255,0.08);
-    color: var(--wbap-text-primary);
-    cursor: pointer;
-    font-size: 14px;
+/* ==================== Plot Optimization Glass UI ==================== */
+#wbap-opt-panel.wbap-opt-panel-root {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.15s ease;
-    z-index: 1;
+    background: radial-gradient(140% 140% at 15% 0%, #33458a 0%, #1d2147 45%, #0c0f21 100%);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    padding: 18px;
+    z-index: 3000;
 }
 
-.wbap-popover-close:hover {
-    background: rgba(255,255,255,0.15);
-}
-
-.wbap-popover-header {
-    background-color: var(--wbap-bg-secondary);
-    padding: 8px 12px;
-    font-size: 13px;
-    font-weight: 600;
-    border-bottom: 1px solid var(--wbap-border-color);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.wbap-popover-content {
-    overflow-y: auto;
-    padding: 4px;
-}
-
-.wbap-popover-backdrop {
-    position: fixed;
-    inset: 0;
-    background: transparent;
-    z-index: 20005;
-}
-
-.wbap-opt-fab {
-    position: fixed;
-    right: 18px;
-    bottom: 96px;
-    width: 72px;
-    height: 72px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.65));
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25), 0 0 0 2px rgba(255, 255, 255, 0.1);
-    overflow: hidden;
-    cursor: pointer;
-    z-index: 20050;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    user-select: none;
-    touch-action: manipulation;
-}
-
-.wbap-opt-fab::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: var(--wbap-opt-fab-img, url('./assets/wbap-fab-kato.png'));
-    background-size: contain;
-    background-position: center;
-    background-repeat: no-repeat;
-    opacity: 0.96;
-}
-
-.wbap-opt-fab::after {
-    content: '优';
-    position: relative;
-    font-weight: 700;
-    font-size: 18px;
-    color: rgba(0, 0, 0, 0.55);
-    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
-    mix-blend-mode: multiply;
-}
-
-.wbap-opt-fab:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 22px rgba(0, 0, 0, 0.3), 0 0 0 2px rgba(255, 255, 255, 0.2);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.wbap-btn-icon-xs {
-    background: transparent;
-    border: none;
-    color: var(--wbap-text-muted);
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.wbap-btn-icon-xs:hover {
-    color: var(--wbap-text);
-}
-
-
-/* Mobile Tweaks */
-@media (max-width: 767px) {
-    .wbap-chat-footer {
-        padding-bottom: calc(12px + env(safe-area-inset-bottom));
-    }
-
-    .wbap-chat-bubble {
-        max-width: 90%;
-    }
-}
-
-/* ==========================================================================
-   剧情优化面板 (Plot Optimization Panel) - Reconstruction
-   ========================================================================== */
-
-/* 全屏遮罩 */
-.wbap-opt-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
-    z-index: 20000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
-}
-
-.wbap-opt-overlay.open {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-/* 主面板 - 玻璃拟态 */
-.wbap-opt-window {
-    width: 800px;
-    height: 600px;
+.wbap-opt-container {
+    width: 520px;
+    height: clamp(560px, 88vh, 860px);
     max-width: 95vw;
     max-height: 90vh;
-    background: linear-gradient(135deg, rgba(30, 30, 40, 0.85), rgba(40, 40, 50, 0.7));
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-    border-radius: 20px;
+    background: linear-gradient(165deg, rgba(59, 77, 137, 0.55) 0%, rgba(24, 29, 59, 0.7) 50%, rgba(18, 20, 40, 0.75) 100%);
+    border-radius: 18px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    transform: scale(0.95);
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    color: #eef3ff;
 }
 
-.wbap-opt-overlay.open .wbap-opt-window {
-    transform: scale(1);
-}
-
-/* 顶部栏 */
 .wbap-opt-header {
-    height: 60px;
-    padding: 0 20px;
+    padding: 16px 18px 10px;
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    flex-shrink: 0;
+    align-items: center;
 }
 
-.wbap-opt-title {
+.wbap-opt-title-group .wbap-opt-title {
     font-size: 18px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.9);
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
-    display: flex;
-    flex-direction: column;
+    font-weight: 700;
+    letter-spacing: 0.4px;
 }
 
-.wbap-opt-subtitle {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.5);
-    font-weight: normal;
-    margin-top: 2px;
+.wbap-opt-title-group .wbap-opt-subtitle {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.65);
+    margin-top: 4px;
+    letter-spacing: 0.8px;
 }
 
-.wbap-opt-header-actions {
+.wbap-opt-actions {
     display: flex;
     gap: 10px;
 }
 
-.wbap-opt-btn-icon {
+.wbap-opt-icon-btn {
     width: 36px;
     height: 36px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: linear-gradient(140deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+    color: #dbe5ff;
     cursor: pointer;
-    transition: all 0.2s;
+    display: grid;
+    place-items: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
 }
 
-.wbap-opt-btn-icon:hover {
-    background: rgba(255, 255, 255, 0.2);
+.wbap-opt-icon-btn:hover {
+    border-color: rgba(255, 255, 255, 0.3);
     color: #fff;
-    transform: translateY(-1px);
 }
 
-/* 聊天区域 */
-.wbap-opt-chat-area {
+.wbap-opt-body {
     flex: 1;
+    min-height: 0;
+    padding: 0 16px 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.wbap-opt-chat-stream {
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
-    padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 14px;
+    padding: 6px 2px 10px;
     scroll-behavior: smooth;
 }
 
-/* 气泡通用样式 */
-.wbap-opt-bubble-row {
+.wbap-opt-bubble {
     display: flex;
-    width: 100%;
+    max-width: 85%;
 }
 
-.wbap-opt-bubble-row.assistant {
-    justify-content: flex-start;
+.wbap-opt-bubble.ai {
+    align-self: flex-start;
 }
 
-.wbap-opt-bubble-row.user {
+.wbap-opt-bubble.user {
+    align-self: flex-end;
     justify-content: flex-end;
 }
 
-.wbap-opt-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 12px;
-    flex-shrink: 0;
-    color: rgba(255, 255, 255, 0.6);
-}
-
-/* 核心要求：气泡绝对不扩张 + 初始默认大小 */
-.wbap-opt-bubble {
-    width: 480px;
-    /* 固定宽度，或者 max-width: 60%? 图片看起来像是有一定宽度的 */
-    max-width: 70%;
-    height: 120px;
-    /* 默认固定高度，死值 */
-    min-height: 80px;
-    /* 最小高度 */
-
-    /* 严格限制，不允许被内容撑开 */
-    overflow-y: auto;
-    overflow-x: hidden;
-
-    padding: 16px;
-    font-size: 14px;
-    line-height: 1.6;
-    color: rgba(255, 255, 255, 0.9);
-    border-radius: 16px;
-    position: relative;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-}
-
-/* 仅在非常短的内容下，也不允许缩太小，保持一种"卡片"感 */
 .wbap-opt-bubble-content {
-    /* 内部容器 */
+    padding: 12px 14px;
+    border-radius: 14px;
+    line-height: 1.6;
+    font-size: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(8px);
 }
 
-/* AI 气泡样式 */
-.wbap-opt-bubble.assistant {
-    background: rgba(40, 40, 50, 0.6);
+.wbap-opt-bubble.ai .wbap-opt-bubble-content {
+    background: linear-gradient(160deg, rgba(72, 82, 110, 0.8), rgba(46, 53, 75, 0.85));
+    color: #e9eefb;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.wbap-opt-bubble.user .wbap-opt-bubble-content {
+    background: linear-gradient(140deg, #568cff, #7dd2ff);
+    color: #0a1630;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-top-left-radius: 4px;
 }
 
-/* User 气泡样式 */
-.wbap-opt-bubble.user {
-    background: linear-gradient(135deg, rgba(60, 100, 255, 0.4), rgba(40, 80, 220, 0.3));
-    border: 1px solid rgba(100, 150, 255, 0.3);
-    border-top-right-radius: 4px;
-    text-align: left;
-    /* 即使在右侧，文字也左对齐更易读 */
+.wbap-opt-preview-overlay {
+    background: radial-gradient(110% 110% at 50% 30%, rgba(64, 86, 146, 0.9), rgba(19, 23, 44, 0.95));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    border-radius: 14px;
 }
 
-/* 气泡滚动条美化 */
-.wbap-opt-bubble::-webkit-scrollbar {
-    width: 4px;
+.wbap-opt-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #e8edff;
 }
 
-.wbap-opt-bubble::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 2px;
+.wbap-opt-preview-body {
+    flex: 1;
+    padding: 12px;
 }
 
-.wbap-opt-bubble::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-/* 底部输入区 */
 .wbap-opt-footer {
-    padding: 15px 20px 20px 20px;
-    background: rgba(20, 20, 30, 0.4);
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
-    flex-shrink: 0;
+    padding: 12px 16px 16px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
+    background: linear-gradient(180deg, rgba(14, 17, 34, 0.6), rgba(10, 12, 24, 0.8));
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-/* 底部工具条 */
 .wbap-opt-toolbar {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
-.wbap-opt-pill {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 6px 12px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.7);
-    display: flex;
+.wbap-opt-chip {
+    display: inline-flex;
     align-items: center;
     gap: 6px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: linear-gradient(120deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #dbe5ff;
+    font-size: 12px;
+}
+
+.wbap-opt-chip-btn {
     cursor: pointer;
-    transition: background 0.2s;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.wbap-opt-pill:hover {
-    background: rgba(255, 255, 255, 0.15);
+.wbap-opt-select {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 12px;
+    min-width: 120px;
+    outline: none;
+    cursor: pointer;
 }
 
-.wbap-opt-pill i {
-    font-size: 14px;
-}
-
-/* 输入框容器 */
-.wbap-opt-input-wrapper {
-    position: relative;
-    width: 100%;
+.wbap-opt-input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 10px 12px 10px 14px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .wbap-opt-input {
-    width: 100%;
-    height: 50px;
-    /* 固定高度输入框，像微信那样 */
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 12px 50px 12px 16px;
-    /* 右侧留给发送按钮 */
-    color: #fff;
-    font-size: 14px;
-    resize: none;
-    outline: none;
-    font-family: inherit;
-}
-
-.wbap-opt-input:focus {
-    border-color: rgba(100, 150, 255, 0.5);
-    background: rgba(0, 0, 0, 0.4);
-}
-
-/* 发送按钮 */
-.wbap-opt-send-btn {
-    position: absolute;
-    right: 8px;
-    bottom: 8px;
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
+    flex: 1;
     background: transparent;
     border: none;
-    color: rgba(255, 255, 255, 0.4);
+    color: #e9eefb;
+    font-size: 14px;
+    resize: none;
+    min-height: 28px;
+    max-height: 120px;
+    outline: none;
+    line-height: 1.5;
+}
+
+.wbap-opt-send-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    border: none;
+    background: linear-gradient(160deg, #66a6ff, #6ddefd);
+    color: #0c1530;
     cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    box-shadow: 0 12px 30px rgba(102, 166, 255, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    display: grid;
+    place-items: center;
 }
 
 .wbap-opt-send-btn:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
+    box-shadow: 0 16px 36px rgba(102, 166, 255, 0.45);
 }
 
-.wbap-opt-send-btn.active {
-    color: #4facfe;
+.wbap-opt-send-btn.loading {
+    opacity: 0.7;
+    pointer-events: none;
 }
 
-/* ============================================================================
-   [32] 剧情优化面板移动端适配 (Mobile Optimization Panel)
-   ============================================================================ */
-@media (max-width: 768px) {
-
-    /* 覆盖全屏遮罩对齐，避免内容偏移 */
-    #wbap-optimization-overlay {
-        align-items: stretch;
-        justify-content: flex-start;
-        padding: 0;
-        height: 100vh;
-        height: 100svh;
-        height: 100dvh;
-    }
-
-    /* 面板容器强制全屏 - 但顶部留出空间 */
-    /* 面板容器强制全屏 */
-    #wbap-optimization-overlay .wbap-opt-window {
-        width: 100vw !important;
-        height: 100vh !important;
-        height: 100svh !important;
-        height: 100dvh !important;
-        left: 0 !important;
-        top: 0 !important;
-        /* 强制全屏，不留空隙 */
-        transform: none !important;
-        border-radius: 0 !important;
-        /* 移除圆角 */
-        max-width: 100vw !important;
-        max-height: 100dvh !important;
-        margin: 0 !important;
-        border: none !important;
-        display: flex;
-        flex-direction: column;
-        align-self: stretch;
-
-        background-color: #1e1e24;
-    }
-
-    /* 保证聊天区域自适应高度 */
-    .wbap-opt-chat-area {
-        flex: 1;
-        min-height: 0;
-        /* Important for flex scrolling */
-        overflow-y: auto;
-    }
-
-    /* 保证聊天区域自适应高度 */
-    .wbap-opt-chat-area {
-        flex: 1;
-        height: auto !important;
-        /* Allow flex grow */
-        min-height: 0;
-    }
-
-    /* 调整气泡宽度 */
-    .wbap-opt-bubble {
-        max-width: 85% !important;
-        font-size: 15px;
-        /* 稍微调大字号 */
-    }
-
-    .wbap-opt-bubble-row {
-        margin-bottom: 16px;
-        /* 增加行间距 */
-    }
-
-    /* 底部工具栏布局优化 */
-    .wbap-opt-input-area {
-        gap: 8px;
-        padding: 8px 12px;
-        flex-direction: column-reverse;
-        /* 将工具栏放到输入框上方? 不，保持原样但允许换行 */
-        /* Ensure input area doesn't get covered by keyboard or bottom nav too badly, 
-           though viewport resize usually handles this */
-        padding-bottom: calc(8px + env(safe-area-inset-bottom));
-    }
-
-    .wbap-opt-toolbar {
-        /* Allow scroll if too many items, or wrap */
-        width: 100%;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        padding-bottom: 4px;
-        /* Scrollbar space */
-        justify-content: flex-start;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .wbap-opt-pill {
-        flex-shrink: 0;
-        /* Prevent squishing */
-    }
-
-    .wbap-popover-backdrop {
-        z-index: 21990;
-    }
-
-    .wbap-opt-fab {
-        right: 14px;
-        bottom: 82px;
-        width: 68px;
-        height: 68px;
-    }
-
-    /* 弹窗改为底部菜单 (Bottom Sheet) */
-    .wbap-popover.wbap-mobile-bottom-sheet {
-        position: fixed !important;
-        top: auto !important;
-        bottom: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        max-height: 60vh !important;
-        border-radius: 16px 16px 0 0 !important;
-        transform: translateY(100%);
-        animation: wbapSlideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards !important;
-        border: none !important;
-        border-top: 1px solid var(--wbap-border-color);
-        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4) !important;
-        z-index: 22000 !important;
-        /* Above panel overlay */
-    }
-
-    @keyframes wbapSlideUp {
-        from {
-            transform: translateY(100%);
-        }
-
-        to {
-            transform: translateY(0);
-        }
-    }
-
-    /* Adjust popover content padding for safe area */
-    .wbap-popover-content {
-        padding-bottom: calc(10px + env(safe-area-inset-bottom));
-    }
-
-    /* 预览遮罩全屏 */
-    .wbap-inner-overlay {
-        border-radius: 0 !important;
-    }
+#wbap-opt-fab {
+    width: 54px;
+    height: 54px;
+    border-radius: 18px;
+    background: linear-gradient(145deg, #5fa2ff, #66e0ff);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+    color: #0b1530;
+    position: fixed;
+    right: 22px;
+    bottom: 22px;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    z-index: 3100;
 }
+
+#wbap-opt-fab.wbap-hidden {
+    display: none !important;
+}
+
+.wbap-opt-mini-btn {
+    background: linear-gradient(120deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #f4f7ff;
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.wbap-opt-mini-primary {
+    background: linear-gradient(140deg, #6fa6ff, #79e1ff);
+    color: #0b1530;
+    border: none;
+    box-shadow: 0 8px 18px rgba(121, 225, 255, 0.35);
+}
+
+.wbap-opt-popover {
+    position: absolute;
+    bottom: 68px;
+    left: 18px;
+    width: 480px;
+    max-width: 90vw;
+    background: linear-gradient(150deg, rgba(54, 67, 117, 0.92), rgba(23, 27, 52, 0.95));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    z-index: 3200;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.wbap-opt-pop-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #e9eefb;
+    font-weight: 600;
+}
+
+.wbap-opt-pop-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.wbap-opt-pop-body {
+    display: grid;
+    grid-template-columns: 1fr 1.1fr;
+    gap: 10px;
+    padding: 10px 12px;
+    min-height: 220px;
+}
+
+.wbap-opt-pop-col {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.wbap-opt-pop-title {
+    font-size: 12px;
+    color: rgba(233, 238, 251, 0.8);
+    margin-bottom: 6px;
+}
+
+.wbap-opt-list {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-right: 2px;
+}
+
+.wbap-opt-list-entries {
+    max-height: 260px;
+}
+
+.wbap-opt-list label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    border: 1px solid transparent;
+}
+
+.wbap-opt-list label:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.wbap-opt-empty {
+    color: rgba(233, 238, 251, 0.6);
+    font-size: 12px;
+    text-align: center;
+    padding: 12px 0;
+}
+
+.wbap-opt-pop-footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+

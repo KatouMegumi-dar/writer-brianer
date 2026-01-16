@@ -89,7 +89,7 @@
         'dom_utils.js', // 通用工具模块
         'event_manager.js',
         'ui_logic.js',
-        'optimization.js', // NEW: 剧情优化逻辑
+        'optimization.js',
         'entry_selector.js',
         'interceptor.js'
     ];
@@ -127,6 +127,9 @@
         await WBAP.loadConfig(); // loadConfig 会处理角色初始化
         await WBAP.PromptManager.initialize();
         WBAP.EventManager.initialize();
+        if (WBAP.Optimization && typeof WBAP.Optimization.updateFloatingButtonVisibility === 'function') {
+            WBAP.Optimization.updateFloatingButtonVisibility(true, 0);
+        }
 
         // 核心模块加载完成后，注入 UI
         if (WBAP.UI && typeof WBAP.UI.injectUI === 'function') {

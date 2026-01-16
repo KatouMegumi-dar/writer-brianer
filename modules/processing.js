@@ -667,26 +667,6 @@
                 Logger.warn('Aggregator enabled but endpoint is missing or disabled.');
             }
 
-            if (config.enablePlotOptimization && WBAP.Optimization && WBAP.Optimization.openPanel) {
-                const selectedEntries = {};
-                usedEntriesByBook.forEach((set, bookName) => {
-                    selectedEntries[bookName] = Array.from(set);
-                });
-                // 如果启用了剧情优化，则不直接返回 AnalysisBlock，而是打开面板
-                // 并将当前结果传递给面板
-                WBAP.Optimization.openPanel(finalContent, {
-                    userInput,
-                    context,
-                    worldBooks: Array.from(usedWorldBooks),
-                    selectedEntries,
-                    endpoints: executedEndpointIds // 传递已使用的端点信息等
-                });
-
-                // 返回 null 或特定标记，告诉调用者已被拦截
-                Logger.log('Processing intercepted by Plot Optimization Panel.');
-                return null;
-            }
-
             return buildAnalysisBlock(finalContent);
         } catch (e) {
             Logger.error('Selective mode processing failed', e);

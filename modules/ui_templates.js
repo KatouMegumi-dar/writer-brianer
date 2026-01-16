@@ -526,7 +526,7 @@
 </div>
 `;
 
-    const PROGRESS_PANEL_HTML = `
+const PROGRESS_PANEL_HTML = `
 <div id="wbap-progress-panel" class="wbap-progress-panel">
     <button id="wbap-progress-close" class="wbap-progress-close" title="关闭">&times;</button>
     <div class="wbap-progress-content">
@@ -537,48 +537,81 @@
 </div>
 `;
 
-
-
     const OPTIMIZATION_PANEL_HTML = `
-<div id="wbap-optimization-overlay" class="wbap-opt-overlay">
-    <div class="wbap-opt-window">
-        <!-- 顶部栏 -->
+<div id="wbap-opt-panel" class="wbap-opt-panel-root wbap-hidden">
+    <div class="wbap-opt-container">
         <div class="wbap-opt-header">
-            <div class="wbap-opt-title">
-                剧情优化助手
-                <span class="wbap-opt-subtitle">Plot Optimization</span>
+            <div class="wbap-opt-title-group">
+                <div class="wbap-opt-title">剧情优化助手</div>
+                <div class="wbap-opt-subtitle">Plot Optimization</div>
             </div>
-            <div class="wbap-opt-header-actions">
-                <button id="wbap-opt-preview-btn" class="wbap-opt-btn-icon" title="预览全文">
-                    <i class="fa-solid fa-book-open"></i>
+            <div class="wbap-opt-actions">
+                <button id="wbap-opt-preview-toggle" class="wbap-opt-icon-btn" title="预览优化稿">
+                    <i class="fa-regular fa-clone"></i>
                 </button>
-                <button id="wbap-opt-close-btn" class="wbap-opt-btn-icon" title="关闭">
-                    <i class="fa-solid fa-times"></i>
+                <button id="wbap-opt-close" class="wbap-opt-icon-btn" title="关闭">
+                    <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
         </div>
-
-        <!-- 聊天区域 -->
-        <div id="wbap-opt-chat-area" class="wbap-opt-chat-area">
-            <!-- 气泡示例动态生成 -->
+        <div class="wbap-opt-body">
+            <div id="wbap-opt-chat" class="wbap-opt-chat-stream"></div>
+            <div id="wbap-opt-preview" class="wbap-opt-preview-overlay">
+                <div class="wbap-opt-preview-header">
+                    <span>预览优化稿</span>
+                    <button id="wbap-opt-preview-close" class="wbap-opt-icon-btn" title="关闭预览">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="wbap-opt-preview-body">
+                    <textarea id="wbap-opt-preview-text" class="wbap-opt-textarea" readonly></textarea>
+                </div>
+            </div>
         </div>
-
-        <!-- 底部输入区 -->
         <div class="wbap-opt-footer">
             <div class="wbap-opt-toolbar">
-                <div class="wbap-opt-pill" id="wbap-opt-worldbook-pill">
-                    <i class="fa-solid fa-book"></i> 世界书
+                <button class="wbap-opt-chip wbap-opt-chip-btn" id="wbap-opt-world-btn" type="button">
+                    <i class="fa-solid fa-book-open"></i>
+                    <span id="wbap-opt-world-label">世界书</span>
+                </button>
+                <div id="wbap-opt-world-pop" class="wbap-opt-popover wbap-hidden">
+                    <div class="wbap-opt-pop-header">
+                        <div>选择世界书与条目</div>
+                        <div class="wbap-opt-pop-actions">
+                            <button id="wbap-opt-world-refresh" class="wbap-opt-mini-btn" type="button">刷新</button>
+                            <button id="wbap-opt-world-close" class="wbap-opt-icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
+                    <div class="wbap-opt-pop-body">
+                        <div class="wbap-opt-pop-col">
+                            <div class="wbap-opt-pop-title">世界书</div>
+                            <div id="wbap-opt-world-list" class="wbap-opt-list"></div>
+                        </div>
+                        <div class="wbap-opt-pop-col">
+                            <div class="wbap-opt-pop-title">条目（可选）</div>
+                            <div id="wbap-opt-entry-list" class="wbap-opt-list wbap-opt-list-entries">
+                                <div class="wbap-opt-empty">请先选择世界书</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="wbap-opt-pop-footer">
+                        <button id="wbap-opt-world-clear" class="wbap-opt-mini-btn" type="button">清空</button>
+                        <button id="wbap-opt-world-apply" class="wbap-opt-mini-btn wbap-opt-mini-primary" type="button">完成</button>
+                    </div>
                 </div>
-                <div class="wbap-opt-pill" id="wbap-opt-api-pill">
-                    <i class="fa-solid fa-cloud"></i> API
+                <div class="wbap-opt-chip">
+                    <i class="fa-solid fa-server"></i>
+                    <select id="wbap-opt-endpoint-select" class="wbap-opt-select"></select>
                 </div>
-                <div class="wbap-opt-pill" id="wbap-opt-model-pill">
-                    <i class="fa-solid fa-microchip"></i> Model
+                <div class="wbap-opt-chip">
+                    <i class="fa-solid fa-microchip"></i>
+                    <select id="wbap-opt-model-select" class="wbap-opt-select"></select>
+                    <button id="wbap-opt-model-refresh" class="wbap-opt-mini-btn" type="button">刷新</button>
                 </div>
             </div>
-            <div class="wbap-opt-input-wrapper">
-                <textarea id="wbap-opt-input" class="wbap-opt-input" placeholder="在此输入..." rows="1"></textarea>
-                <button id="wbap-opt-send-btn" class="wbap-opt-send-btn">
+            <div class="wbap-opt-input-row">
+                <textarea id="wbap-opt-input" class="wbap-opt-input" rows="1" placeholder="在此输入..."></textarea>
+                <button id="wbap-opt-send" class="wbap-opt-send-btn" title="发送">
                     <i class="fa-solid fa-paper-plane"></i>
                 </button>
             </div>
