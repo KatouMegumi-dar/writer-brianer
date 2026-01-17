@@ -4,39 +4,45 @@
  */
 
 (function () {
-    const Logger = window.WBAP.Logger;
 
     /**
-     * Parses a stream chunk from OpenAI-compatible API.
-     * @param {string} chunk - The raw chunk string.
+     * Parses a single SSE data line from OpenAI-compatible API.
+     * @param {string} line - The raw SSE line.
      * @returns {string} - The extracted content delta.
      */
-    function parseStreamChunk(chunk) {
-        const lines = chunk.split('\n');
-        let delta = '';
-
-        for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || trimmed === 'data: [DONE]') continue;
-            if (trimmed.startsWith('data: ')) {
-                try {
-                    const jsonStr = trimmed.substring(6);
-                    const json = JSON.parse(jsonStr);
-                    if (json.choices && json.choices.length > 0) {
-                        const choice = json.choices[0];
-                        if (choice.delta && choice.delta.content) {
-                            delta += choice.delta.content;
-                        } else if (choice.text) {
-                            // Legacy completion format support
-                            delta += choice.text;
-                        }
-                    }
-                } catch (e) {
-                    // Ignore parse errors for partial chunks
+    function parseStreamLine(line) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed === 'data: [DONE]') return '';
+        if (!trimmed.startsWith('data: ')) return '';
+        try {
+            const jsonStr = trimmed.substring(6);
+            const json = JSON.parse(jsonStr);
+            if (json.choices && json.choices.length > 0) {
+                const choice = json.choices[0];
+                if (choice.delta && choice.delta.content) {
+                    return choice.delta.content;
+                }
+                if (choice.text) {
+                    // Legacy completion format support
+                    return choice.text;
                 }
             }
+        } catch (e) {
+            // Ignore parse errors for partial chunks
         }
-        return delta;
+        return '';
+    }
+
+    function resolveChatCompletionUrl(rawUrl) {
+        const trimmedUrl = String(rawUrl || '').replace(/\/+$/, '');
+        if (!trimmedUrl) return '';
+        if (/\/(chat\/)?completions$/i.test(trimmedUrl)) {
+            return trimmedUrl;
+        }
+        if (/\/v1$/i.test(trimmedUrl)) {
+            return `${trimmedUrl}/chat/completions`;
+        }
+        return `${trimmedUrl}/v1/chat/completions`;
     }
 
     /**
@@ -48,96 +54,101 @@
      * @param {function} onError - Callback for errors: (err) => void.
      * @returns {AbortController} - Controller to abort the request.
      */
-    async function streamCompletion(apiConfig, messages, onChunk, onDone, onError) {
+    function streamCompletion(apiConfig, messages, onChunk, onDone, onError) {
         const controller = new AbortController();
         const signal = controller.signal;
+        const handleChunk = typeof onChunk === 'function' ? onChunk : null;
+        const handleDone = typeof onDone === 'function' ? onDone : null;
+        const handleError = typeof onError === 'function' ? onError : null;
         let fullText = '';
 
-        try {
-            const url = apiConfig.apiUrl.endsWith('/') ? `${apiConfig.apiUrl}chat/completions` : `${apiConfig.apiUrl}/chat/completions`;
+        const run = async () => {
+            try {
+                const rawUrl = apiConfig.apiUrl || apiConfig.url;
+                const url = resolveChatCompletionUrl(rawUrl);
+                if (!url) {
+                    throw new Error('API URL is required for streaming.');
+                }
 
-            const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiConfig.apiKey}`
-            };
+                const apiKey = apiConfig.apiKey || apiConfig.key;
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream'
+                };
+                if (apiKey) {
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                }
+                if (apiConfig.extraHeaders) {
+                    Object.assign(headers, apiConfig.extraHeaders);
+                }
 
-            const body = {
-                model: apiConfig.model,
-                messages: messages,
-                stream: true,
-                max_tokens: apiConfig.maxTokens || 2000,
-                temperature: apiConfig.temperature || 0.7,
-                top_p: apiConfig.topP || 1,
-                presence_penalty: apiConfig.presencePenalty || 0,
-                frequency_penalty: apiConfig.frequencyPenalty || 0
-            };
+                const body = {
+                    model: apiConfig.model,
+                    messages: messages,
+                    stream: true,
+                    max_tokens: apiConfig.maxTokens || 2000,
+                    temperature: apiConfig.temperature || 0.7,
+                    top_p: apiConfig.topP || 1,
+                    presence_penalty: apiConfig.presencePenalty || 0,
+                    frequency_penalty: apiConfig.frequencyPenalty || 0
+                };
 
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(body),
-                signal: signal
-            });
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(body),
+                    signal: signal
+                });
 
-            if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(`API Error ${response.status}: ${errText}`);
-            }
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(`API Error ${response.status}: ${errText}`);
+                }
 
-            if (!response.body) {
-                throw new Error('Response body is null (Streaming not supported?)');
-            }
+                if (!response.body) {
+                    throw new Error('Response body is null (Streaming not supported?)');
+                }
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder('utf-8');
-            let buffer = '';
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let buffer = '';
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
 
-                const chunk = decoder.decode(value, { stream: true });
-                buffer += chunk;
+                    const chunk = decoder.decode(value, { stream: true });
+                    buffer += chunk;
 
-                // Process complete lines in buffer
-                const lines = buffer.split('\n');
-                // Keep the last line in buffer if it's incomplete (doesn't end with \n)
-                // Actually, split removes separators. If the last char wasn't \n, the last item is partial.
-                // But data: lines are usually usually complete.
-                // Safer approach: split by data: prefix?
-                // Standard SSE format is double newline separated.
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
 
-                // Simplified buffer handling for standard SSE
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                    const content = parseStreamChunk(line);
-                    if (content) {
-                        fullText += content;
-                        onChunk(content);
+                    for (const line of lines) {
+                        const content = parseStreamLine(line);
+                        if (content) {
+                            fullText += content;
+                            if (handleChunk) handleChunk(content);
+                        }
                     }
                 }
-            }
 
-            // Process remaining buffer
-            if (buffer) {
-                const content = parseStreamChunk(buffer);
-                if (content) {
-                    fullText += content;
-                    onChunk(content);
+                if (buffer) {
+                    const content = parseStreamLine(buffer);
+                    if (content) {
+                        fullText += content;
+                        if (handleChunk) handleChunk(content);
+                    }
+                }
+
+                if (handleDone) handleDone(fullText);
+            } catch (err) {
+                if (handleError) {
+                    handleError(err);
                 }
             }
+        };
 
-            onDone(fullText);
-
-        } catch (err) {
-            if (err.name === 'AbortError') {
-                // Ignore aborts
-            } else {
-                onError(err);
-            }
-        }
-
+        void run();
         return controller;
     }
 

@@ -327,11 +327,11 @@
                 const tableLike = isTableWorldBook(book);
 
                 const endpointsForBook = tasksByBook[currentBookName];
+                const enabledEntries = Object.entries(book.entries)
+                    .filter(([, e]) => e && e.disable !== true);
                 for (const { endpoint, assigned } of endpointsForBook) {
                     let content = '';
                     let entryIds = Array.isArray(assigned) ? assigned : [];
-                    const enabledEntries = Object.entries(book.entries)
-                        .filter(([, e]) => e && e.disable !== true);
                     const usedEntryIds = new Set();
 
                     if (tableLike) {
@@ -660,10 +660,6 @@
                 }
 
                 const controller = new AbortController();
-                const aggTaskId = `aggregator-${aggEndpoint.id}`;
-                const aggTask = { id: aggTaskId, name: `${aggEndpoint.name || '总局 API'} - 二次处理` };
-                const aggAbortMap = new Map([[aggTaskId, controller]]);
-                let aggRan = false;
 
                 const combinedPrompts = WBAP.PromptManager.getCombinedPrompts();
                 let aggPromptIndex = aggregatorMode.promptIndex || 0;
@@ -702,7 +698,6 @@
                             );
                             // 只输出总局结果（去除前序分段的合并文本）
                             finalContent = aggResult.trim();
-                            aggRan = true;
                         } catch (err) {
                             const message = err.name === 'AbortError' ? 'Aggregator aborted' : err.message;
                             Logger.error('Aggregator processing failed', err);

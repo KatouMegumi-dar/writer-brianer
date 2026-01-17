@@ -270,9 +270,14 @@
         scrollChatToBottom();
     }
 
-    function closePanel() {
+    function closePanel(options = {}) {
         const root = state.elements.root;
         if (!root) return;
+        const { skipLevel3Cancel = false } = options;
+        if (!skipLevel3Cancel && state.mode === 'level3' && state.level3Reject) {
+            state.level3Reject(new Error('用户取消了三级优化'));
+            resetLevel3State();
+        }
         root.classList.remove('open');
         hidePreview();
     }
@@ -781,9 +786,23 @@
             autoResizeInput();
         }
 
+        let streamIndex = null;
+        let usedStreaming = false;
+        let rafId = null;
+        const scheduleRender = () => {
+            if (typeof requestAnimationFrame !== 'function') {
+                renderMessages();
+                return;
+            }
+            if (rafId) return;
+            rafId = requestAnimationFrame(() => {
+                rafId = null;
+                renderMessages();
+            });
+        };
+
         try {
             state.sending = true;
-            state.abortController = new AbortController();
             setSending(true);
 
             const { apiConfig, model } = resolveApiConfig();
@@ -795,18 +814,85 @@
             const systemPrompt = (preset.systemPrompt || '').trim() || DEFAULT_SYSTEM_PROMPT;
             const prompt = buildOptimizationPrompt(userText, worldbookContent, preset.promptTemplate);
 
-            // 带取消信号的API调用
-            const result = await WBAP.callAI(model, prompt, systemPrompt, {
-                ...apiConfig,
-                signal: state.abortController.signal
-            });
-            appendMessage('ai', result?.trim() || '（未返回内容）');
+            const allowStream = apiConfig?.enableStreaming !== false;
+            const streamApiUrl = apiConfig?.apiUrl || apiConfig?.url;
+            const canStream = allowStream
+                && streamApiUrl
+                && WBAP.StreamUtils
+                && typeof WBAP.StreamUtils.streamCompletion === 'function';
+
+            if (canStream) {
+                usedStreaming = true;
+                appendMessage('ai', '');
+                streamIndex = state.messages.length - 1;
+
+                const messages = [];
+                if (systemPrompt) {
+                    messages.push({ role: 'system', content: systemPrompt });
+                }
+                messages.push({ role: 'user', content: prompt });
+
+                const streamConfig = {
+                    ...apiConfig,
+                    apiUrl: streamApiUrl,
+                    apiKey: apiConfig.apiKey || apiConfig.key
+                };
+
+                const streamPromise = new Promise((resolve, reject) => {
+                    state.abortController = WBAP.StreamUtils.streamCompletion(
+                        streamConfig,
+                        messages,
+                        (chunk) => {
+                            if (!chunk || streamIndex == null) return;
+                            const target = state.messages[streamIndex];
+                            if (!target) return;
+                            target.content += chunk;
+                            scheduleRender();
+                        },
+                        (fullText) => {
+                            if (streamIndex != null && state.messages[streamIndex]) {
+                                const fallback = state.messages[streamIndex].content || '（未返回内容）';
+                                state.messages[streamIndex].content = fullText || fallback;
+                            }
+                            renderMessages();
+                            resolve(fullText);
+                        },
+                        (err) => {
+                            reject(err);
+                        }
+                    );
+                });
+
+                await streamPromise;
+            } else {
+                state.abortController = new AbortController();
+                // 带取消信号的API调用
+                const result = await WBAP.callAI(model, prompt, systemPrompt, {
+                    ...apiConfig,
+                    signal: state.abortController.signal
+                });
+                appendMessage('ai', result?.trim() || '（未返回内容）');
+            }
         } catch (err) {
             if (err.name === 'AbortError' || err.message?.includes('abort')) {
-                appendMessage('ai', '⚠️ 生成已取消');
+                const message = '⚠️ 生成已取消';
+                if (usedStreaming && streamIndex != null && state.messages[streamIndex]) {
+                    const target = state.messages[streamIndex];
+                    target.content = target.content ? `${target.content}\n\n${message}` : message;
+                    renderMessages();
+                } else {
+                    appendMessage('ai', message);
+                }
             } else {
                 Logger.error('剧情优化失败', err);
-                appendMessage('ai', `⚠️ 优化失败：${err.message || err}`);
+                const message = `⚠️ 优化失败：${err.message || err}`;
+                if (usedStreaming && streamIndex != null && state.messages[streamIndex]) {
+                    const target = state.messages[streamIndex];
+                    target.content = target.content ? `${target.content}\n\n${message}` : message;
+                    renderMessages();
+                } else {
+                    appendMessage('ai', message);
+                }
             }
         } finally {
             state.sending = false;
@@ -1182,7 +1268,7 @@
 
         state.level3Reject(new Error('用户取消了三级优化'));
         resetLevel3State();
-        closePanel();
+        closePanel({ skipLevel3Cancel: true });
     }
 
     /**
