@@ -571,14 +571,12 @@
                 }
 
                 const chunkResults = [];
-                const chunkShare = 95 / chunks.length;
                 for (let i = 0; i < chunks.length; i++) {
                     const promptsForChunk = buildPromptFromTemplate(promptTemplate, {
                         userInput,
                         worldbookContent: chunks[i],
                         context
                     });
-                    const progressBase = chunkShare * i;
                     try {
                         const chunkResult = await callAI(
                             task.apiConfig.model,

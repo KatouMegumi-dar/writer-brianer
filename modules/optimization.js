@@ -291,7 +291,15 @@
 
     function updatePreviewText() {
         const lastAi = [...state.messages].reverse().find(m => m.role === 'ai');
-        state.previewText = lastAi?.content || '';
+        let content = lastAi?.content || '';
+
+        // 如果是初始结果消息，去除前缀
+        const prefix = '📋 **一级/二级处理结果：**\n\n';
+        if (content.startsWith(prefix)) {
+            content = content.substring(prefix.length);
+        }
+
+        state.previewText = content;
         if (state.elements.previewText) {
             state.elements.previewText.value = state.previewText;
         }
@@ -1059,7 +1067,7 @@
             // 先显示之前模型返回的结果，让用户查看
             state.messages = [
                 { role: 'ai', content: '📋 **一级/二级处理结果：**\n\n' + inputText },
-                { role: 'ai', content: '💡 您可以直接点击 **"确认并发送"** 使用以上结果，或在输入框中输入修改要求进行进一步优化。' }
+                { role: 'system', content: '💡 您可以直接点击 **"确认并发送"** 使用以上结果，或在输入框中输入修改要求进行进一步优化。' }
             ];
             renderMessages();
             openPanelForLevel3();
@@ -1133,12 +1141,21 @@
     function confirmLevel3() {
         if (state.mode !== 'level3' || !state.level3Resolve) return;
 
-        // 获取最后一条 AI 回复作为优化结果
-        const lastAi = [...state.messages].reverse().find(m => m.role === 'ai');
-        const result = lastAi?.content || state.level3Context?.inputText || '';
+        // 如果用户进行了优化操作（有超过2条消息，初始时只有2条提示消息）
+        // 则获取最后一条 AI 回复作为优化结果
+        // 否则直接使用原始的处理结果
+        let finalResult = state.level3Context?.inputText || '';
 
-        // 过滤掉以 ⚠️ 开头的错误消息
-        const finalResult = result.startsWith('⚠️') ? (state.level3Context?.inputText || '') : result;
+        if (state.messages.length > 2) {
+            // 找到最后一条 AI 回复（跳过初始的提示消息）
+            const lastAi = [...state.messages].reverse().find(m => m.role === 'ai');
+            const content = lastAi?.content || '';
+
+            // 过滤掉以 ⚠️ 或 💡 或 📋 开头的系统消息
+            if (content && !content.startsWith('⚠️') && !content.startsWith('💡') && !content.startsWith('📋')) {
+                finalResult = content;
+            }
+        }
 
         state.level3Resolve(finalResult);
         resetLevel3State();

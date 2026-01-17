@@ -1482,7 +1482,7 @@
     // ========== Progress Panel Control ==========
     let progressTimer = null;
     let progressStartTime = 0;
-    let progressTasks = new Map(); // 存储所有任务 { id: { name, status, progress, startTime, timerInterval, completed, abortController } }
+    let progressTasks = new Map(); // 存储所有任务 { id: { name, status, progress, startTime, timerInterval, completed } }
     let totalTaskCount = 0; // 总任务数
     let cancelAllCallback = null; // 取消全部任务的回调
     let cancelTaskCallbacks = new Map(); // 单个任务取消回调 { taskId: callback }
@@ -1534,6 +1534,7 @@
         if (barEl) {
             barEl.style.width = '0%';
             barEl.classList.add('animated');
+            barEl.classList.remove('completed'); // 重置完成状态
         }
         if (statusEl) statusEl.textContent = '准备中...';
         if (percentEl) percentEl.textContent = '0%';
@@ -1716,6 +1717,7 @@
             clearInterval(task.timerInterval);
         }
         progressTasks.delete(taskId);
+        cancelTaskCallbacks.delete(taskId); // 清理取消回调
 
         const cardEl = document.getElementById(`wbap-task-${taskId}`);
         if (cardEl) {
