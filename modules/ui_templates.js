@@ -39,7 +39,7 @@
                     <button id="wbap-prompt-edit-btn" class="wbap-btn wbap-btn-xs" title="编辑"><i class="fa-solid fa-pencil"></i> 编辑</button>
                     <button id="wbap-prompt-export-btn" class="wbap-btn wbap-btn-xs" title="导出"><i class="fa-solid fa-upload"></i> 导出</button>
                     <button id="wbap-prompt-delete-btn" class="wbap-btn wbap-btn-xs wbap-btn-danger" title="删除"><i class="fa-solid fa-trash"></i> 删除</button>
-                    <button id="wbap-prompt-bind-apis-btn" class="wbap-btn wbap-btn-xs" title="绑定 API"><i class="fa-solid fa-link"></i> 选择 API</button>
+                    <button id="wbap-prompt-bind-apis-btn" class="wbap-btn wbap-btn-xs" title="绑定 API"><i class="fa-solid fa-link"></i> 绑定 API</button>
                 </div>
                 <input type="file" id="wbap-prompt-file-input" accept=".json" class="wbap-hidden">
                 
@@ -566,13 +566,27 @@
 <div id="wbap-progress-panel" class="wbap-progress-panel">
     <button id="wbap-progress-close" class="wbap-progress-close" title="关闭">&times;</button>
     <div class="wbap-progress-content">
-        <h4 id="wbap-progress-title">正在思考...</h4>
-        <div class="wbap-progress-bar-container">
-            <div id="wbap-progress-bar" class="wbap-progress-bar"></div>
+        <!-- 总进度区域 -->
+        <div class="wbap-progress-header">
+            <h4 id="wbap-progress-title">正在处理...</h4>
+            <div class="wbap-progress-main-timer">
+                <i class="fa-regular fa-clock"></i>
+                <span id="wbap-progress-timer">0.000s</span>
+            </div>
         </div>
-        <div class="wbap-progress-info">
-            <span id="wbap-progress-status">0%</span>
-            <span id="wbap-progress-timer">00:00</span>
+        <div class="wbap-progress-bar-container wbap-progress-main-bar">
+            <div id="wbap-progress-bar" class="wbap-progress-bar">
+                <div class="wbap-progress-glow"></div>
+            </div>
+        </div>
+        <div class="wbap-progress-summary">
+            <span id="wbap-progress-status">准备中...</span>
+            <span id="wbap-progress-percent">0%</span>
+        </div>
+        
+        <!-- 任务列表区域 -->
+        <div id="wbap-progress-tasks" class="wbap-progress-tasks">
+            <!-- 动态添加的任务卡片 -->
         </div>
     </div>
     <div class="wbap-resize-handle" id="wbap-progress-resize-handle"></div>

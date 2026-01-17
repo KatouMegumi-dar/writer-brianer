@@ -1095,6 +1095,11 @@
      * 打开面板用于三级优化
      */
     function openPanelForLevel3() {
+        // 隐藏进度面板，避免与三级优化面板重叠
+        if (WBAP.UI?.hideProgressPanel) {
+            WBAP.UI.hideProgressPanel();
+        }
+
         const root = state.elements.root;
         if (!root) return;
         root.classList.add('open', 'level3-mode');

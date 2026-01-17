@@ -73,6 +73,7 @@
             contextRounds: 5,
             enableChunking: false,
             skipProcessedMessages: true,
+            analysisExcludeTags: '',  // 分析排除标签（逗号分隔）
             showProgressPanel: true,
             enablePlotOptimization: false,
             enablePlotOptimizationFloatButton: false,
@@ -108,7 +109,8 @@
             },
             globalSettings: {
                 maxConcurrent: 0,
-                timeout: 0
+                timeout: 0,
+                enableSuperConcurrency: false  // 超级并发（流水线继承模式）
             }
         };
     }

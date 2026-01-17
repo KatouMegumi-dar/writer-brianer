@@ -246,14 +246,16 @@
             });
             mainBindingList.addEventListener('change', () => {
                 const selected = getPromptBindingSelection();
+                // 更新绑定标签和摘要（不重新渲染列表，避免列表收起）
                 updatePromptBindingTags(selected);
+                updatePromptBindingSummary(selected);
                 const cfg = WBAP.CharacterManager ? WBAP.CharacterManager.getCurrentCharacterConfig() : WBAP.config;
                 const prompts = WBAP.PromptManager.getCombinedPrompts();
                 const currentPrompt = prompts[cfg.selectedPromptIndex || 0];
                 if (currentPrompt) {
                     WBAP.PromptManager.addOrUpdatePrompt({ ...currentPrompt, boundEndpointIds: selected });
                     WBAP.saveConfig();
-                    refreshPromptList();
+                    // 注意：不再调用 refreshPromptList()，避免列表自动收起
                 }
             });
         }
@@ -1280,6 +1282,20 @@
         return Array.from(document.querySelectorAll('#wbap-prompt-binding-list input[type="checkbox"]:checked')).map(cb => cb.value);
     }
 
+    function updatePromptBindingSummary(selectedIds = []) {
+        const bindingSummary = document.getElementById('wbap-prompt-binding-summary');
+        if (!bindingSummary) return;
+        const currentConfig = WBAP.CharacterManager ? WBAP.CharacterManager.getCurrentCharacterConfig() : WBAP.config;
+        const endpoints = currentConfig?.selectiveMode?.apiEndpoints || [];
+        const nameMap = new Map(endpoints.map(ep => [ep.id, ep.name || ep.id]));
+        if (selectedIds.length === 0) {
+            bindingSummary.textContent = '未绑定 API（将使用所有已配置实例）。';
+        } else {
+            const names = selectedIds.map(id => nameMap.get(id) || id);
+            bindingSummary.textContent = `已绑定 ${selectedIds.length} 个 API：${names.join(', ')}`;
+        }
+    }
+
     function bindEditorEvents() {
         document.getElementById('wbap-prompt-editor-close')?.addEventListener('click', closePromptEditor);
         document.getElementById('wbap-prompt-editor-cancel')?.addEventListener('click', closePromptEditor);
@@ -1466,46 +1482,159 @@
     // ========== Progress Panel Control ==========
     let progressTimer = null;
     let progressStartTime = 0;
+    let progressTasks = new Map(); // 存储所有任务 { id: { name, status, progress, startTime, timerInterval } }
 
     function showProgressPanel(message = '正在处理...') {
         const panel = document.getElementById('wbap-progress-panel');
         if (!panel) return;
 
-        // Reset state
+        // 重置状态
         const titleEl = document.getElementById('wbap-progress-title');
         const barEl = document.getElementById('wbap-progress-bar');
         const statusEl = document.getElementById('wbap-progress-status');
+        const percentEl = document.getElementById('wbap-progress-percent');
         const timerEl = document.getElementById('wbap-progress-timer');
+        const tasksEl = document.getElementById('wbap-progress-tasks');
 
         if (titleEl) titleEl.textContent = message;
         if (barEl) {
             barEl.style.width = '0%';
             barEl.classList.add('animated');
         }
-        if (statusEl) statusEl.textContent = '0%';
-        if (timerEl) timerEl.textContent = '00:00';
+        if (statusEl) statusEl.textContent = '准备中...';
+        if (percentEl) percentEl.textContent = '0%';
+        if (timerEl) timerEl.textContent = '0.000s';
+        if (tasksEl) tasksEl.innerHTML = '';
+
+        // 清空任务列表
+        progressTasks.forEach(task => {
+            if (task.timerInterval) clearInterval(task.timerInterval);
+        });
+        progressTasks.clear();
 
         panel.classList.add('open');
 
-        // Start timer
+        // 启动主计时器（毫秒精度）
         if (progressTimer) clearInterval(progressTimer);
         progressStartTime = Date.now();
         progressTimer = setInterval(() => {
             const elapsed = Date.now() - progressStartTime;
-            const seconds = (elapsed / 1000).toFixed(1);
+            const seconds = (elapsed / 1000).toFixed(3);
             if (timerEl) timerEl.textContent = `${seconds}s`;
-        }, 100);
+        }, 16); // ~60fps更新
     }
 
     function updateProgressPanel(percent, statusText) {
         const bar = document.getElementById('wbap-progress-bar');
-        const status = document.getElementById('wbap-progress-status');
+        const statusEl = document.getElementById('wbap-progress-status');
+        const percentEl = document.getElementById('wbap-progress-percent');
+
         if (bar) {
             bar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
             if (percent >= 100) bar.classList.remove('animated');
         }
-        if (status && statusText) {
-            status.textContent = statusText;
+        if (percentEl) {
+            percentEl.textContent = `${Math.round(percent)}%`;
+        }
+        if (statusEl && statusText) {
+            statusEl.textContent = statusText;
+        }
+    }
+
+    function addProgressTask(taskId, taskName, initialStatus = '等待中...') {
+        const tasksEl = document.getElementById('wbap-progress-tasks');
+        if (!tasksEl) return;
+
+        // 创建任务卡片
+        const taskCard = document.createElement('div');
+        taskCard.className = 'wbap-progress-task-card';
+        taskCard.id = `wbap-task-${taskId}`;
+        taskCard.innerHTML = `
+            <div class="wbap-task-header">
+                <span class="wbap-task-name">${taskName}</span>
+                <span class="wbap-task-timer" id="wbap-task-timer-${taskId}">0.000s</span>
+            </div>
+            <div class="wbap-task-bar-container">
+                <div class="wbap-task-bar" id="wbap-task-bar-${taskId}">
+                    <div class="wbap-task-glow"></div>
+                </div>
+            </div>
+            <div class="wbap-task-footer">
+                <span class="wbap-task-status" id="wbap-task-status-${taskId}">${initialStatus}</span>
+                <span class="wbap-task-percent" id="wbap-task-percent-${taskId}">0%</span>
+            </div>
+        `;
+        tasksEl.appendChild(taskCard);
+
+        // 启动任务计时器
+        const taskStartTime = Date.now();
+        const timerInterval = setInterval(() => {
+            const timerEl = document.getElementById(`wbap-task-timer-${taskId}`);
+            if (timerEl) {
+                const elapsed = Date.now() - taskStartTime;
+                timerEl.textContent = `${(elapsed / 1000).toFixed(3)}s`;
+            }
+        }, 16);
+
+        // 存储任务信息
+        progressTasks.set(taskId, {
+            name: taskName,
+            status: initialStatus,
+            progress: 0,
+            startTime: taskStartTime,
+            timerInterval: timerInterval
+        });
+
+        // 滚动到最新任务
+        tasksEl.scrollTop = tasksEl.scrollHeight;
+    }
+
+    function updateProgressTask(taskId, status, progress) {
+        const task = progressTasks.get(taskId);
+        if (!task) return;
+
+        const barEl = document.getElementById(`wbap-task-bar-${taskId}`);
+        const statusEl = document.getElementById(`wbap-task-status-${taskId}`);
+        const percentEl = document.getElementById(`wbap-task-percent-${taskId}`);
+        const cardEl = document.getElementById(`wbap-task-${taskId}`);
+
+        if (barEl) {
+            barEl.style.width = `${Math.min(100, Math.max(0, progress))}%`;
+            if (progress >= 100) {
+                barEl.classList.add('completed');
+            }
+        }
+        if (statusEl && status) {
+            statusEl.textContent = status;
+        }
+        if (percentEl) {
+            percentEl.textContent = `${Math.round(progress)}%`;
+        }
+        if (cardEl && progress >= 100) {
+            cardEl.classList.add('completed');
+            // 停止该任务的计时器
+            if (task.timerInterval) {
+                clearInterval(task.timerInterval);
+                task.timerInterval = null;
+            }
+        }
+
+        // 更新任务状态
+        task.status = status || task.status;
+        task.progress = progress;
+    }
+
+    function removeProgressTask(taskId) {
+        const task = progressTasks.get(taskId);
+        if (task && task.timerInterval) {
+            clearInterval(task.timerInterval);
+        }
+        progressTasks.delete(taskId);
+
+        const cardEl = document.getElementById(`wbap-task-${taskId}`);
+        if (cardEl) {
+            cardEl.classList.add('removing');
+            setTimeout(() => cardEl.remove(), 300);
         }
     }
 
@@ -1518,6 +1647,11 @@
             clearInterval(progressTimer);
             progressTimer = null;
         }
+        // 清理所有任务计时器
+        progressTasks.forEach(task => {
+            if (task.timerInterval) clearInterval(task.timerInterval);
+        });
+        progressTasks.clear();
     }
 
     function makeElementDraggable(element, handle) {
@@ -1663,7 +1797,10 @@
         refreshSecondaryPromptUI,
         showProgressPanel,
         updateProgressPanel,
-        hideProgressPanel
+        hideProgressPanel,
+        addProgressTask,
+        updateProgressTask,
+        removeProgressTask
     };
     window.WBAP.syncMobileRootFix = syncMobileRootFix;
 
