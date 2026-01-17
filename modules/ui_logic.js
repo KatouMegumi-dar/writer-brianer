@@ -1482,9 +1482,42 @@
     // ========== Progress Panel Control ==========
     let progressTimer = null;
     let progressStartTime = 0;
-    let progressTasks = new Map(); // 存储所有任务 { id: { name, status, progress, startTime, timerInterval } }
+    let progressTasks = new Map(); // 存储所有任务 { id: { name, status, progress, startTime, timerInterval, completed, abortController } }
+    let totalTaskCount = 0; // 总任务数
+    let cancelAllCallback = null; // 取消全部任务的回调
+    let cancelTaskCallbacks = new Map(); // 单个任务取消回调 { taskId: callback }
 
-    function showProgressPanel(message = '正在处理...') {
+    function setCancelAllCallback(callback) {
+        cancelAllCallback = callback;
+    }
+
+    function setCancelTaskCallback(taskId, callback) {
+        if (callback) {
+            cancelTaskCallbacks.set(taskId, callback);
+        } else {
+            cancelTaskCallbacks.delete(taskId);
+        }
+    }
+
+    function triggerCancelAll() {
+        if (cancelAllCallback && typeof cancelAllCallback === 'function') {
+            cancelAllCallback();
+            // 更新 UI 状态
+            const statusEl = document.getElementById('wbap-progress-status');
+            if (statusEl) statusEl.textContent = '正在取消...';
+        }
+    }
+
+    function triggerCancelTask(taskId) {
+        const callback = cancelTaskCallbacks.get(taskId);
+        if (callback && typeof callback === 'function') {
+            callback(taskId);
+            // 更新任务 UI
+            updateProgressTask(taskId, '取消中...', progressTasks.get(taskId)?.progress || 0);
+        }
+    }
+
+    function showProgressPanel(message = '正在处理...', taskCount = 0) {
         const panel = document.getElementById('wbap-progress-panel');
         if (!panel) return;
 
@@ -1495,6 +1528,7 @@
         const percentEl = document.getElementById('wbap-progress-percent');
         const timerEl = document.getElementById('wbap-progress-timer');
         const tasksEl = document.getElementById('wbap-progress-tasks');
+        const taskCountEl = document.getElementById('wbap-progress-task-count');
 
         if (titleEl) titleEl.textContent = message;
         if (barEl) {
@@ -1505,23 +1539,26 @@
         if (percentEl) percentEl.textContent = '0%';
         if (timerEl) timerEl.textContent = '0.000s';
         if (tasksEl) tasksEl.innerHTML = '';
+        if (taskCountEl) taskCountEl.textContent = `0/${taskCount}`;
 
-        // 清空任务列表
+        // 清空任务列表和回调
         progressTasks.forEach(task => {
             if (task.timerInterval) clearInterval(task.timerInterval);
         });
         progressTasks.clear();
+        cancelTaskCallbacks.clear();
+        totalTaskCount = taskCount;
 
         panel.classList.add('open');
 
-        // 启动主计时器（毫秒精度）
+        // 启动主计时器（毫秒精度，~60fps）
         if (progressTimer) clearInterval(progressTimer);
         progressStartTime = Date.now();
         progressTimer = setInterval(() => {
             const elapsed = Date.now() - progressStartTime;
             const seconds = (elapsed / 1000).toFixed(3);
             if (timerEl) timerEl.textContent = `${seconds}s`;
-        }, 16); // ~60fps更新
+        }, 16);
     }
 
     function updateProgressPanel(percent, statusText) {
@@ -1531,13 +1568,33 @@
 
         if (bar) {
             bar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
-            if (percent >= 100) bar.classList.remove('animated');
+            if (percent >= 100) {
+                bar.classList.remove('animated');
+                bar.classList.add('completed');
+            }
         }
         if (percentEl) {
             percentEl.textContent = `${Math.round(percent)}%`;
         }
         if (statusEl && statusText) {
             statusEl.textContent = statusText;
+        }
+    }
+
+    function updateTaskCount() {
+        const taskCountEl = document.getElementById('wbap-progress-task-count');
+        if (!taskCountEl) return;
+
+        let completedCount = 0;
+        progressTasks.forEach(task => {
+            if (task.completed) completedCount++;
+        });
+        taskCountEl.textContent = `${completedCount}/${totalTaskCount || progressTasks.size}`;
+
+        // 自动更新总进度条
+        if (totalTaskCount > 0) {
+            const overallPercent = (completedCount / totalTaskCount) * 100;
+            updateProgressPanel(overallPercent, completedCount >= totalTaskCount ? '全部完成' : `已完成 ${completedCount}/${totalTaskCount}`);
         }
     }
 
@@ -1551,12 +1608,18 @@
         taskCard.id = `wbap-task-${taskId}`;
         taskCard.innerHTML = `
             <div class="wbap-task-header">
-                <span class="wbap-task-name">${taskName}</span>
-                <span class="wbap-task-timer" id="wbap-task-timer-${taskId}">0.000s</span>
+                <span class="wbap-task-name" title="${taskName}">${taskName}</span>
+                <div class="wbap-task-actions">
+                    <button class="wbap-task-cancel-btn" id="wbap-task-cancel-${taskId}" title="取消此任务">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                    <span class="wbap-task-timer" id="wbap-task-timer-${taskId}">0.000s</span>
+                </div>
             </div>
             <div class="wbap-task-bar-container">
                 <div class="wbap-task-bar" id="wbap-task-bar-${taskId}">
                     <div class="wbap-task-glow"></div>
+                    <div class="wbap-task-shimmer"></div>
                 </div>
             </div>
             <div class="wbap-task-footer">
@@ -1566,7 +1629,16 @@
         `;
         tasksEl.appendChild(taskCard);
 
-        // 启动任务计时器
+        // 绑定单个任务取消按钮
+        const cancelBtn = document.getElementById(`wbap-task-cancel-${taskId}`);
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                triggerCancelTask(taskId);
+            });
+        }
+
+        // 启动任务计时器（毫秒精度）
         const taskStartTime = Date.now();
         const timerInterval = setInterval(() => {
             const timerEl = document.getElementById(`wbap-task-timer-${taskId}`);
@@ -1582,8 +1654,12 @@
             status: initialStatus,
             progress: 0,
             startTime: taskStartTime,
-            timerInterval: timerInterval
+            timerInterval: timerInterval,
+            completed: false
         });
+
+        // 更新任务计数
+        updateTaskCount();
 
         // 滚动到最新任务
         tasksEl.scrollTop = tasksEl.scrollHeight;
@@ -1610,13 +1686,23 @@
         if (percentEl) {
             percentEl.textContent = `${Math.round(progress)}%`;
         }
-        if (cardEl && progress >= 100) {
+
+        // 任务完成处理
+        if (cardEl && progress >= 100 && !task.completed) {
             cardEl.classList.add('completed');
+            task.completed = true;
             // 停止该任务的计时器
             if (task.timerInterval) {
                 clearInterval(task.timerInterval);
                 task.timerInterval = null;
             }
+            // 隐藏取消按钮
+            const cancelBtn = document.getElementById(`wbap-task-cancel-${taskId}`);
+            if (cancelBtn) cancelBtn.style.display = 'none';
+            // 清理取消回调
+            cancelTaskCallbacks.delete(taskId);
+            // 更新任务计数
+            updateTaskCount();
         }
 
         // 更新任务状态
@@ -1636,6 +1722,9 @@
             cardEl.classList.add('removing');
             setTimeout(() => cardEl.remove(), 300);
         }
+
+        // 更新任务计数
+        updateTaskCount();
     }
 
     function hideProgressPanel() {
@@ -1652,7 +1741,11 @@
             if (task.timerInterval) clearInterval(task.timerInterval);
         });
         progressTasks.clear();
+        cancelTaskCallbacks.clear();
+        cancelAllCallback = null;
+        totalTaskCount = 0;
     }
+
 
     function makeElementDraggable(element, handle) {
         let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
@@ -1783,6 +1876,13 @@
             if (closeBtn) {
                 closeBtn.addEventListener('click', hideProgressPanel);
             }
+
+            // Cancel all button
+            const cancelAllBtn = document.getElementById('wbap-progress-cancel-all');
+            if (cancelAllBtn) {
+                cancelAllBtn.addEventListener('click', triggerCancelAll);
+            }
+
             panel.setAttribute('data-wbap-bound', 'true');
         }
     }
@@ -1800,7 +1900,9 @@
         hideProgressPanel,
         addProgressTask,
         updateProgressTask,
-        removeProgressTask
+        removeProgressTask,
+        setCancelAllCallback,
+        setCancelTaskCallback
     };
     window.WBAP.syncMobileRootFix = syncMobileRootFix;
 

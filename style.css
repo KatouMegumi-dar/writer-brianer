@@ -2360,28 +2360,28 @@ html.wbap-overlay-open {
 }
 
 /* ============================================================================
-   [35] 进度面板样式 (Progress Panel Styles)
+   [35] 进度面板样式 (Progress Panel Styles) - 重构版
    ============================================================================ */
 .wbap-progress-panel {
     position: fixed;
     bottom: 80px;
     right: 20px;
-    width: 360px;
+    width: 380px;
     max-width: calc(100vw - 40px);
-    background: linear-gradient(135deg, rgba(30, 30, 45, 0.95), rgba(20, 20, 35, 0.98));
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(100, 100, 200, 0.2);
-    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(25, 25, 40, 0.96), rgba(18, 18, 32, 0.98));
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(120, 120, 220, 0.25);
+    border-radius: 18px;
     box-shadow:
-        0 8px 32px rgba(0, 0, 0, 0.4),
-        0 0 0 1px rgba(255, 255, 255, 0.05) inset,
-        0 0 60px rgba(100, 100, 200, 0.1);
+        0 12px 40px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+        0 0 80px rgba(100, 100, 220, 0.12);
     z-index: 9999;
     opacity: 0;
     visibility: hidden;
     transform: translateY(20px) scale(0.95);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
 }
 
@@ -2411,7 +2411,7 @@ html.wbap-overlay-open {
 }
 
 .wbap-progress-close:hover {
-    background: rgba(255, 100, 100, 0.2);
+    background: rgba(255, 100, 100, 0.25);
     color: #ff6b6b;
     transform: scale(1.1);
 }
@@ -2420,12 +2420,21 @@ html.wbap-overlay-open {
     padding: 20px;
 }
 
-/* 头部区域 */
+/* 头部区域 - 增强布局 */
 .wbap-progress-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     margin-bottom: 16px;
+    gap: 12px;
+}
+
+.wbap-progress-title-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
 }
 
 .wbap-progress-header h4 {
@@ -2434,36 +2443,112 @@ html.wbap-overlay-open {
     font-weight: 600;
     color: var(--wbap-text);
     letter-spacing: 0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.wbap-progress-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.wbap-progress-task-count {
+    font-size: 12px;
+    font-family: var(--wbap-font-mono);
+    color: var(--wbap-text-muted);
+    background: rgba(100, 100, 200, 0.12);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+/* 头部操作区域 */
+.wbap-progress-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+/* 取消全部按钮 */
+.wbap-progress-cancel-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(220, 38, 38, 0.15));
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 16px;
+    color: #f87171;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.wbap-progress-cancel-btn:hover {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(220, 38, 38, 0.25));
+    border-color: rgba(239, 68, 68, 0.5);
+    color: #fca5a5;
+    transform: scale(1.02);
+}
+
+.wbap-progress-cancel-btn:active {
+    transform: scale(0.98);
+}
+
+.wbap-progress-cancel-btn i {
+    font-size: 10px;
 }
 
 .wbap-progress-main-timer {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 600;
     color: var(--wbap-primary-light);
     font-family: var(--wbap-font-mono);
-    background: rgba(100, 100, 200, 0.15);
-    padding: 4px 10px;
+    background: linear-gradient(135deg, rgba(100, 100, 220, 0.2), rgba(140, 90, 240, 0.15));
+    padding: 6px 14px;
     border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(100, 100, 200, 0.15);
+    flex-shrink: 0;
 }
 
 .wbap-progress-main-timer i {
-    font-size: 11px;
-    opacity: 0.8;
+    font-size: 12px;
+    opacity: 0.9;
+    animation: timerPulse 1.5s ease-in-out infinite;
 }
 
-/* 主进度条 */
+@keyframes timerPulse {
+
+    0%,
+    100% {
+        opacity: 0.6;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.1);
+    }
+}
+
+/* 主进度条 - 增强流动效果 */
 .wbap-progress-bar-container {
-    height: 8px;
+    height: 10px;
     background: rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
+    border-radius: 12px;
     overflow: hidden;
     position: relative;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .wbap-progress-main-bar {
-    height: 10px;
+    height: 12px;
     margin-bottom: 12px;
 }
 
@@ -2472,51 +2557,96 @@ html.wbap-overlay-open {
     width: 0%;
     background: linear-gradient(90deg,
             #6366f1 0%,
-            #8b5cf6 25%,
-            #a855f7 50%,
-            #8b5cf6 75%,
+            #8b5cf6 20%,
+            #a855f7 40%,
+            #d946ef 60%,
+            #a855f7 80%,
             #6366f1 100%);
-    background-size: 200% 100%;
-    border-radius: 10px;
+    background-size: 300% 100%;
+    border-radius: 12px;
     position: relative;
-    transition: width 0.3s ease-out;
+    transition: width 0.25s ease-out;
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
 }
 
 .wbap-progress-bar.animated {
-    animation: progressFlow 2s linear infinite;
+    animation: progressFlowFast 1s linear infinite;
+}
+
+.wbap-progress-bar.completed {
+    background: linear-gradient(90deg, #22c55e, #4ade80, #22c55e);
+    background-size: 200% 100%;
+    animation: progressFlowComplete 2s linear infinite;
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
 }
 
 .wbap-progress-glow {
     position: absolute;
     top: 0;
-    right: 0;
+    left: -60px;
     width: 60px;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-    animation: progressGlow 1.5s ease-in-out infinite;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+    animation: progressGlowSlide 1.2s ease-in-out infinite;
 }
 
-@keyframes progressFlow {
+.wbap-progress-shimmer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.15) 50%,
+            transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmerMove 1.5s ease-in-out infinite;
+}
+
+@keyframes progressFlowFast {
+    0% {
+        background-position: 300% 0;
+    }
+
+    100% {
+        background-position: 0% 0;
+    }
+}
+
+@keyframes progressFlowComplete {
     0% {
         background-position: 200% 0;
     }
 
     100% {
-        background-position: -200% 0;
+        background-position: 0% 0;
     }
 }
 
-@keyframes progressGlow {
-
-    0%,
-    100% {
+@keyframes progressGlowSlide {
+    0% {
+        left: -60px;
         opacity: 0;
-        transform: translateX(-100%);
     }
 
     50% {
         opacity: 1;
-        transform: translateX(100%);
+    }
+
+    100% {
+        left: 100%;
+        opacity: 0;
+    }
+}
+
+@keyframes shimmerMove {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
     }
 }
 
@@ -2528,80 +2658,99 @@ html.wbap-overlay-open {
     font-size: 12px;
     color: var(--wbap-text-secondary);
     margin-bottom: 16px;
+    padding: 0 2px;
+}
+
+#wbap-progress-status {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 #wbap-progress-percent {
     font-family: var(--wbap-font-mono);
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 700;
     color: var(--wbap-primary-light);
+    text-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
+    min-width: 40px;
+    text-align: right;
 }
 
-/* 任务列表区域 */
+/* 任务列表区域 - 增强滚动支持 */
 .wbap-progress-tasks {
-    max-height: 200px;
+    max-height: 220px;
     overflow-y: auto;
     overflow-x: hidden;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
     padding-right: 4px;
+    scroll-behavior: smooth;
 }
 
 .wbap-progress-tasks::-webkit-scrollbar {
-    width: 4px;
+    width: 5px;
 }
 
 .wbap-progress-tasks::-webkit-scrollbar-track {
     background: rgba(255, 255, 255, 0.05);
-    border-radius: 4px;
+    border-radius: 5px;
 }
 
 .wbap-progress-tasks::-webkit-scrollbar-thumb {
-    background: rgba(100, 100, 200, 0.3);
-    border-radius: 4px;
+    background: linear-gradient(180deg, rgba(100, 100, 200, 0.4), rgba(140, 90, 240, 0.3));
+    border-radius: 5px;
 }
 
 .wbap-progress-tasks::-webkit-scrollbar-thumb:hover {
-    background: rgba(100, 100, 200, 0.5);
+    background: linear-gradient(180deg, rgba(100, 100, 200, 0.6), rgba(140, 90, 240, 0.5));
 }
 
-/* 任务卡片 */
+/* 任务卡片 - 增强样式 */
 .wbap-progress-task-card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 10px;
-    padding: 12px;
+    padding: 10px 12px;
     transition: all 0.3s ease;
     animation: taskSlideIn 0.3s ease-out;
+}
+
+.wbap-progress-task-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(100, 100, 200, 0.2);
 }
 
 @keyframes taskSlideIn {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(12px) scale(0.97);
     }
 
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
     }
 }
 
 .wbap-progress-task-card.completed {
-    border-color: rgba(34, 197, 94, 0.3);
-    background: rgba(34, 197, 94, 0.05);
+    border-color: rgba(34, 197, 94, 0.35);
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(74, 222, 128, 0.05));
 }
 
 .wbap-progress-task-card.removing {
     opacity: 0;
-    transform: translateX(20px);
+    transform: translateX(20px) scale(0.95);
 }
 
 .wbap-task-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
+    gap: 8px;
 }
 
 .wbap-task-name {
@@ -2611,61 +2760,143 @@ html.wbap-overlay-open {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 200px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* 任务操作区域 */
+.wbap-task-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* 单个任务取消按钮 */
+.wbap-task-cancel-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    border-radius: 50%;
+    color: #f87171;
+    font-size: 9px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    opacity: 0.7;
+}
+
+.wbap-task-cancel-btn:hover {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.wbap-task-cancel-btn:active {
+    transform: scale(0.95);
+}
+
+.wbap-progress-task-card.completed .wbap-task-cancel-btn {
+    display: none;
 }
 
 .wbap-task-timer {
     font-size: 11px;
     font-family: var(--wbap-font-mono);
-    color: var(--wbap-text-muted);
+    color: var(--wbap-primary-light);
+    background: rgba(100, 100, 200, 0.1);
+    padding: 2px 6px;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
+.wbap-progress-task-card.completed .wbap-task-timer {
+    color: #4ade80;
+    background: rgba(34, 197, 94, 0.12);
 }
 
 .wbap-task-bar-container {
-    height: 4px;
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 4px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 5px;
     overflow: hidden;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .wbap-task-bar {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, #6366f1, #a855f7);
-    border-radius: 4px;
+    background: linear-gradient(90deg, #6366f1, #a855f7, #6366f1);
+    background-size: 200% 100%;
+    border-radius: 5px;
     position: relative;
     transition: width 0.2s ease-out;
+    animation: taskBarFlow 1.2s linear infinite;
+}
+
+@keyframes taskBarFlow {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: 0% 0;
+    }
 }
 
 .wbap-task-bar.completed {
     background: linear-gradient(90deg, #22c55e, #4ade80);
+    animation: none;
 }
 
 .wbap-task-glow {
     position: absolute;
     top: 0;
-    right: 0;
+    left: -30px;
     width: 30px;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
-    animation: taskGlow 1s ease-in-out infinite;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+    animation: taskGlowSlide 0.8s ease-in-out infinite;
 }
 
-@keyframes taskGlow {
+.wbap-task-shimmer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.2) 50%,
+            transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmerMove 1s ease-in-out infinite;
+}
 
-    0%,
-    100% {
+@keyframes taskGlowSlide {
+    0% {
+        left: -30px;
         opacity: 0;
-        transform: translateX(-100%);
     }
 
     50% {
         opacity: 1;
-        transform: translateX(100%);
+    }
+
+    100% {
+        left: 100%;
+        opacity: 0;
     }
 }
 
-.wbap-task-bar.completed .wbap-task-glow {
+.wbap-task-bar.completed .wbap-task-glow,
+.wbap-task-bar.completed .wbap-task-shimmer {
     display: none;
 }
 
@@ -2674,6 +2905,7 @@ html.wbap-overlay-open {
     justify-content: space-between;
     align-items: center;
     font-size: 11px;
+    gap: 8px;
 }
 
 .wbap-task-status {
@@ -2681,7 +2913,8 @@ html.wbap-overlay-open {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 180px;
+    flex: 1;
+    min-width: 0;
 }
 
 .wbap-progress-task-card.completed .wbap-task-status {
@@ -2692,6 +2925,7 @@ html.wbap-overlay-open {
     font-family: var(--wbap-font-mono);
     font-weight: 600;
     color: var(--wbap-primary-light);
+    flex-shrink: 0;
 }
 
 .wbap-progress-task-card.completed .wbap-task-percent {
@@ -2707,10 +2941,11 @@ html.wbap-overlay-open {
     height: 20px;
     cursor: nwse-resize;
     opacity: 0.3;
+    transition: opacity 0.2s ease;
 }
 
 .wbap-progress-panel .wbap-resize-handle:hover {
-    opacity: 0.6;
+    opacity: 0.7;
 }
 
 .wbap-progress-panel .wbap-resize-handle::after {
@@ -2734,16 +2969,25 @@ html.wbap-overlay-open {
         max-width: none;
     }
 
+    .wbap-progress-header {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .wbap-progress-main-timer {
+        align-self: flex-end;
+    }
+
     .wbap-progress-tasks {
-        max-height: 150px;
+        max-height: 180px;
     }
 
     .wbap-task-name {
-        max-width: 150px;
+        max-width: none;
     }
 
     .wbap-task-status {
-        max-width: 140px;
+        max-width: none;
     }
 }
 

@@ -247,9 +247,8 @@
         let abortAllRequested = false;
 
         try {
-            if (config?.showProgressPanel && WBAP.UI) {
-                WBAP.UI.showProgressPanel('正在初始化任务...');
-            }
+            // 进度面板初始化时传递任务总数（稍后确定）
+            let progressInitialized = false;
 
             if (!config || !config.selectiveMode) {
                 Logger.warn('配置尚未初始化，跳过自选模式处理。');
@@ -504,20 +503,51 @@
                 return null;
             }
 
+            // 初始化进度面板（传递任务总数）
+            if (config?.showProgressPanel && WBAP.UI && !progressInitialized) {
+                WBAP.UI.showProgressPanel('正在处理任务...', taskConfigs.length);
+                progressInitialized = true;
+                // 为每个任务创建进度条目
+                taskConfigs.forEach(task => {
+                    WBAP.UI.addProgressTask(task.id, task.name, '等待中...');
+                });
+            }
+
             // Support single/abort-all termination
             const abortAll = () => {
                 abortAllRequested = true;
                 abortControllers.forEach(ctrl => ctrl.abort());
             };
 
+            // 注册取消全部回调
+            if (config?.showProgressPanel && WBAP.UI?.setCancelAllCallback) {
+                WBAP.UI.setCancelAllCallback(abortAll);
+            }
+
+            // 注册单个任务取消回调
+            const cancelSingleTask = (taskId) => {
+                const controller = abortControllers.get(taskId);
+                if (controller) {
+                    controller.abort();
+                }
+            };
+            if (config?.showProgressPanel && WBAP.UI?.setCancelTaskCallback) {
+                taskConfigs.forEach(task => {
+                    WBAP.UI.setCancelTaskCallback(task.id, cancelSingleTask);
+                });
+            }
+
             let completedTaskCount = 0;
             const processTask = async (task) => {
+                // 更新任务状态为处理中
                 if (config?.showProgressPanel && WBAP.UI) {
-                    const pct = Math.round((completedTaskCount / taskConfigs.length) * 100);
-                    WBAP.UI.updateProgressPanel(pct, `正在处理: ${task.name}`);
+                    WBAP.UI.updateProgressTask(task.id, '处理中...', 10);
                 }
                 if (abortAllRequested || task.controller.signal.aborted) {
                     completedTaskCount++;
+                    if (config?.showProgressPanel && WBAP.UI) {
+                        WBAP.UI.updateProgressTask(task.id, '已终止', 100);
+                    }
                     return { name: task.name, error: abortMessage };
                 }
 
@@ -560,6 +590,9 @@
                     } catch (err) {
                         const message = err.name === 'AbortError' ? 'Task aborted' : err.message;
                         completedTaskCount++;
+                        if (config?.showProgressPanel && WBAP.UI) {
+                            WBAP.UI.updateProgressTask(task.id, `失败: ${message.substring(0, 20)}`, 100);
+                        }
                         return { name: task.name, error: message };
                     }
                 }
@@ -569,9 +602,9 @@
                     : chunkResults[0];
 
                 completedTaskCount++;
+                // 更新任务为已完成状态
                 if (config?.showProgressPanel && WBAP.UI) {
-                    const pct = Math.round((completedTaskCount / taskConfigs.length) * 100);
-                    WBAP.UI.updateProgressPanel(pct, `完成: ${task.name}`);
+                    WBAP.UI.updateProgressTask(task.id, '✓ 完成', 100);
                 }
                 return { name: task.name, result: merged, endpointId: task.apiConfig.id, promptIndex: task.promptIndex };
             };

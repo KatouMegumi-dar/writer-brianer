@@ -566,17 +566,31 @@
 <div id="wbap-progress-panel" class="wbap-progress-panel">
     <button id="wbap-progress-close" class="wbap-progress-close" title="关闭">&times;</button>
     <div class="wbap-progress-content">
-        <!-- 总进度区域 -->
+        <!-- 头部区域 -->
         <div class="wbap-progress-header">
-            <h4 id="wbap-progress-title">正在处理...</h4>
-            <div class="wbap-progress-main-timer">
-                <i class="fa-regular fa-clock"></i>
-                <span id="wbap-progress-timer">0.000s</span>
+            <div class="wbap-progress-title-row">
+                <h4 id="wbap-progress-title">正在处理...</h4>
+                <div class="wbap-progress-stats">
+                    <span id="wbap-progress-task-count" class="wbap-progress-task-count">0/0</span>
+                </div>
+            </div>
+            <div class="wbap-progress-header-actions">
+                <button id="wbap-progress-cancel-all" class="wbap-progress-cancel-btn" title="取消全部任务">
+                    <i class="fa-solid fa-stop"></i>
+                    <span>取消全部</span>
+                </button>
+                <div class="wbap-progress-main-timer">
+                    <i class="fa-regular fa-clock"></i>
+                    <span id="wbap-progress-timer">0.000s</span>
+                </div>
             </div>
         </div>
+        
+        <!-- 总进度条 -->
         <div class="wbap-progress-bar-container wbap-progress-main-bar">
-            <div id="wbap-progress-bar" class="wbap-progress-bar">
+            <div id="wbap-progress-bar" class="wbap-progress-bar animated">
                 <div class="wbap-progress-glow"></div>
+                <div class="wbap-progress-shimmer"></div>
             </div>
         </div>
         <div class="wbap-progress-summary">
@@ -584,7 +598,7 @@
             <span id="wbap-progress-percent">0%</span>
         </div>
         
-        <!-- 任务列表区域 -->
+        <!-- 任务实例列表区域 -->
         <div id="wbap-progress-tasks" class="wbap-progress-tasks">
             <!-- 动态添加的任务卡片 -->
         </div>

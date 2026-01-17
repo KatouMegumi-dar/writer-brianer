@@ -1055,14 +1055,16 @@
 
             // 重置并打开面板
             ensurePanelInjected();
+
+            // 先显示之前模型返回的结果，让用户查看
             state.messages = [
-                { role: 'ai', content: '📝 收到处理结果，正在进行三级优化...' }
+                { role: 'ai', content: '📋 **一级/二级处理结果：**\n\n' + inputText },
+                { role: 'ai', content: '💡 您可以直接点击 **"确认并发送"** 使用以上结果，或在输入框中输入修改要求进行进一步优化。' }
             ];
             renderMessages();
             openPanelForLevel3();
 
-            // 自动触发优化
-            handleSend(inputText);
+            // 不再自动触发优化，等待用户操作
         });
     }
 
