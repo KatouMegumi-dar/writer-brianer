@@ -83,6 +83,7 @@
         'config.js',
         'ui_templates.js',
         'api.js',
+        'stream_utils.js',
         'prompt_manager.js',
         'processing.js',
         'dom_utils.js', // 通用工具模块

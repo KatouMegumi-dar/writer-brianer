@@ -155,7 +155,7 @@
         root.querySelector('#wbap-opt-preview-close')?.addEventListener('click', hidePreview);
 
         if (sendBtn) {
-            sendBtn.addEventListener('click', handleSend);
+            sendBtn.addEventListener('click', () => handleSend());
         }
         if (input) {
             input.addEventListener('keydown', (e) => {
@@ -775,12 +775,13 @@
         if (state.sending) return;
         const input = state.elements.input;
         if (!input) return;
-        const userText = textOverride || input.value.trim();
+        const hasOverride = typeof textOverride === 'string';
+        const userText = hasOverride ? textOverride : input.value.trim();
         if (!userText) return;
 
         // 保存最后一次输入用于重新生成
 
-        if (!textOverride) {
+        if (!hasOverride) {
             appendMessage('user', userText);
             input.value = '';
             autoResizeInput();
@@ -835,7 +836,8 @@
                 const streamConfig = {
                     ...apiConfig,
                     apiUrl: streamApiUrl,
-                    apiKey: apiConfig.apiKey || apiConfig.key
+                    apiKey: apiConfig.apiKey || apiConfig.key,
+                    model: model
                 };
 
                 const streamPromise = new Promise((resolve, reject) => {

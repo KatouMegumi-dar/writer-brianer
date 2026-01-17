@@ -317,8 +317,6 @@
             });
 
             let baseTasks = [];
-            const usedWorldBooks = new Set();
-            const usedEntriesByBook = new Map();
             for (const currentBookName in tasksByBook) {
                 const book = bookCache.get(currentBookName);
                 if (!book || !book.entries) {
@@ -332,7 +330,6 @@
                 for (const { endpoint, assigned } of endpointsForBook) {
                     let content = '';
                     let entryIds = Array.isArray(assigned) ? assigned : [];
-                    const usedEntryIds = new Set();
 
                     if (tableLike) {
                         const selectedIds = Array.isArray(entryIds)
@@ -368,7 +365,6 @@
                         });
                         const columnBlocks = [];
                         columnBest.forEach((info, name) => {
-                            usedEntryIds.add(info.uid);
                             columnBlocks.push(`[${name}]\n${info.entry.content || ''}`);
                         });
                         content = columnBlocks.join('\n\n');
@@ -381,7 +377,6 @@
                         entryIds.forEach(entryId => {
                             const entry = book.entries[entryId];
                             if (entry && entry.disable !== true) {
-                                usedEntryIds.add(entryId);
                                 content += `[${entry.comment || entryId}]\n${entry.content}\n\n`;
                             }
                         });
@@ -394,15 +389,6 @@
                             endpoint,
                             promptContent: content.trim()
                         });
-                        usedWorldBooks.add(currentBookName);
-                        if (usedEntryIds.size > 0) {
-                            let entrySet = usedEntriesByBook.get(currentBookName);
-                            if (!entrySet) {
-                                entrySet = new Set();
-                                usedEntriesByBook.set(currentBookName, entrySet);
-                            }
-                            usedEntryIds.forEach(id => entrySet.add(id));
-                        }
                     }
                 }
             }
@@ -537,14 +523,12 @@
                 });
             }
 
-            let completedTaskCount = 0;
             const processTask = async (task) => {
                 // 更新任务状态为处理中
                 if (config?.showProgressPanel && WBAP.UI) {
                     WBAP.UI.updateProgressTask(task.id, '处理中...', 10);
                 }
                 if (abortAllRequested || task.controller.signal.aborted) {
-                    completedTaskCount++;
                     if (config?.showProgressPanel && WBAP.UI) {
                         WBAP.UI.updateProgressTask(task.id, '已终止', 100);
                     }
@@ -587,7 +571,6 @@
                         chunkResults.push(chunkResult);
                     } catch (err) {
                         const message = err.name === 'AbortError' ? 'Task aborted' : err.message;
-                        completedTaskCount++;
                         if (config?.showProgressPanel && WBAP.UI) {
                             WBAP.UI.updateProgressTask(task.id, `失败: ${message.substring(0, 20)}`, 100);
                         }
@@ -599,7 +582,6 @@
                     ? chunkResults.map((r, idx) => `[分段 ${idx + 1}/${chunkResults.length}]\n${r}`).join('\n\n')
                     : chunkResults[0];
 
-                completedTaskCount++;
                 // 更新任务为已完成状态
                 if (config?.showProgressPanel && WBAP.UI) {
                     WBAP.UI.updateProgressTask(task.id, '✓ 完成', 100);

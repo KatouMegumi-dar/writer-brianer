@@ -61,6 +61,9 @@
         const handleDone = typeof onDone === 'function' ? onDone : null;
         const handleError = typeof onError === 'function' ? onError : null;
         let fullText = '';
+        const timeoutSec = Number(apiConfig?.timeout);
+        const timeoutMs = Number.isFinite(timeoutSec) && timeoutSec > 0 ? timeoutSec * 1000 : 0;
+        const timeoutId = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
         const run = async () => {
             try {
@@ -113,37 +116,45 @@
                 const decoder = new TextDecoder('utf-8');
                 let buffer = '';
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
 
-                    const chunk = decoder.decode(value, { stream: true });
-                    buffer += chunk;
+                        const chunk = decoder.decode(value, { stream: true });
+                        buffer += chunk;
 
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop() || '';
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
 
-                    for (const line of lines) {
-                        const content = parseStreamLine(line);
+                        for (const line of lines) {
+                            const content = parseStreamLine(line);
+                            if (content) {
+                                fullText += content;
+                                if (handleChunk) handleChunk(content);
+                            }
+                        }
+                    }
+
+                    if (buffer) {
+                        const content = parseStreamLine(buffer);
                         if (content) {
                             fullText += content;
                             if (handleChunk) handleChunk(content);
                         }
                     }
-                }
-
-                if (buffer) {
-                    const content = parseStreamLine(buffer);
-                    if (content) {
-                        fullText += content;
-                        if (handleChunk) handleChunk(content);
-                    }
+                } finally {
+                    reader.releaseLock();
                 }
 
                 if (handleDone) handleDone(fullText);
             } catch (err) {
                 if (handleError) {
                     handleError(err);
+                }
+            } finally {
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
                 }
             }
         };
