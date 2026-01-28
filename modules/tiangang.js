@@ -213,19 +213,23 @@
             previousResults: inputText
         });
 
-        const controller = new AbortController();
+        const externalSignal = options.signal;
+        const controller = externalSignal ? null : new AbortController();
+        const activeSignal = externalSignal || controller?.signal;
         const showProgress = !options.suppressProgress && config?.showProgressPanel && WBAP.UI;
         const taskId = 'wbap-tiagang';
         if (showProgress) {
             WBAP.UI.showProgressPanel('\u5929\u7eb2\u5904\u7406\u4e2d...', 1);
             WBAP.UI.addProgressTask(taskId, '\u5929\u7eb2\u5904\u7406', '\u7b49\u5f85\u4e2d...');
-            WBAP.UI.setCancelAllCallback?.(() => controller.abort());
-            WBAP.UI.setCancelTaskCallback?.(taskId, () => controller.abort());
+            if (controller) {
+                WBAP.UI.setCancelAllCallback?.(() => controller.abort());
+                WBAP.UI.setCancelTaskCallback?.(taskId, () => controller.abort());
+            }
             WBAP.UI.updateProgressTask(taskId, '\u5904\u7406\u4e2d...', 10);
         }
 
         try {
-            const normalizedConfig = normalizeApiConfig(apiCfg, options.defaultTimeout || 0, controller.signal);
+            const normalizedConfig = normalizeApiConfig(apiCfg, options.defaultTimeout || 0, activeSignal);
             const result = await WBAP.callAI(
                 normalizedConfig.model,
                 prompts.user,

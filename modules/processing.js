@@ -1105,6 +1105,8 @@
             }
 
             if (tgEnabled) {
+                const tgController = new AbortController();
+                abortControllers.set(tgTaskId, tgController);
                 tgPromise = (async () => {
                     try {
                         if (showProgress) WBAP.UI.updateProgressTask(tgTaskId, '处理中...', 15);
@@ -1117,6 +1119,7 @@
                             context: tgContext,
                             config,
                             defaultTimeout,
+                            signal: tgController.signal,
                             suppressProgress: true
                         });
                         if (showProgress) WBAP.UI.updateProgressTask(tgTaskId, '完成', 100);
@@ -1153,6 +1156,9 @@
                 taskConfigs.forEach(task => {
                     WBAP.UI.setCancelTaskCallback(task.id, cancelSingleTask);
                 });
+                if (tgEnabled) {
+                    WBAP.UI.setCancelTaskCallback(tgTaskId, cancelSingleTask);
+                }
             }
 
             const processTask = async (task) => {

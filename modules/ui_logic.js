@@ -105,7 +105,7 @@
                 ensureFloatButton();
 
                 const progress = ensureProgressPanel(templates);
-                if (progress.created) bindProgressPanelEvents();
+                bindProgressPanelEvents();
 
                 Logger.log('UI 已存在，已补齐缺失组件');
                 return;
@@ -2599,6 +2599,7 @@
     function showProgressPanel(message = '正在处理...', taskCount = 0) {
         const panel = document.getElementById('wbap-progress-panel');
         if (!panel) return;
+        bindProgressPanelEvents();
 
         // 重置状态
         const titleEl = document.getElementById('wbap-progress-title');
