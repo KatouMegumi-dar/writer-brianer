@@ -7,58 +7,6 @@
     window.WBAP = window.WBAP || {};
     const Logger = WBAP.Logger;
 
-    // ========== 全局API端点访问辅助函数 ==========
-    // API端点存储在 globalPools.selectiveMode.apiEndpoints 中（全局共享）
-    // 而不是 characterConfig.selectiveMode.apiEndpoints（已废弃）
-    function getGlobalSelectiveEndpoints() {
-        const pools = WBAP.getGlobalPools ? WBAP.getGlobalPools() : (WBAP.mainConfig?.globalPools || {});
-        if (!pools.selectiveMode) {
-            pools.selectiveMode = { apiEndpoints: [] };
-        }
-        if (!Array.isArray(pools.selectiveMode.apiEndpoints)) {
-            pools.selectiveMode.apiEndpoints = [];
-        }
-        return pools.selectiveMode.apiEndpoints;
-    }
-
-    // ========== 端点世界书绑定辅助函数 ==========
-    // 世界书绑定存储在 characterConfig.selectiveMode.endpointBindings[endpointId] 中
-    // 结构: { worldBooks: string[], assignedEntriesMap: { [bookName]: string[] } }
-    function getEndpointBinding(endpointId) {
-        const config = WBAP.CharacterManager.getCurrentCharacterConfig();
-        if (!config.selectiveMode) {
-            config.selectiveMode = { endpointBindings: {} };
-        }
-        if (!config.selectiveMode.endpointBindings) {
-            config.selectiveMode.endpointBindings = {};
-        }
-        const binding = config.selectiveMode.endpointBindings[endpointId];
-        if (!binding) {
-            return { worldBooks: [], assignedEntriesMap: {} };
-        }
-        return {
-            worldBooks: Array.isArray(binding.worldBooks) ? binding.worldBooks : [],
-            assignedEntriesMap: binding.assignedEntriesMap || {}
-        };
-    }
-
-    function setEndpointBinding(endpointId, worldBooks, assignedEntriesMap) {
-        const config = WBAP.CharacterManager.getCurrentCharacterConfig();
-        if (!config.selectiveMode) {
-            config.selectiveMode = { endpointBindings: {} };
-        }
-        if (!config.selectiveMode.endpointBindings) {
-            config.selectiveMode.endpointBindings = {};
-        }
-        config.selectiveMode.endpointBindings[endpointId] = {
-            worldBooks: Array.isArray(worldBooks) ? worldBooks : [],
-            assignedEntriesMap: assignedEntriesMap || {}
-        };
-    }
-
-    // 当前编辑的世界书绑定（临时存储，保存时写入角色配置）
-    let currentEditingBinding = { worldBooks: [], assignedEntriesMap: {} };
-
     let panelElement = null;
     let settingsElement = null;
     let tiagangElement = null;
@@ -464,12 +412,13 @@
         });
 
         document.getElementById('wbap-add-api-btn')?.addEventListener('click', () => {
-            const endpoints = getGlobalSelectiveEndpoints();
-            endpoints.push({
+            const config = WBAP.CharacterManager.getCurrentCharacterConfig();
+            if (!config.selectiveMode.apiEndpoints) {
+                config.selectiveMode.apiEndpoints = [];
+            }
+            config.selectiveMode.apiEndpoints.push({
                 id: `ep_${Date.now()}`,
-                name: `新增API-${endpoints.length + 1}`,
-                apiChannel: 'direct',
-                apiProvider: 'openai',
+                name: `新增API-${config.selectiveMode.apiEndpoints.length + 1}`,
                 apiUrl: '',
                 apiKey: '',
                 model: '',
@@ -482,9 +431,10 @@
                 retryDelayMs: 800,
                 timeout: 60,
                 enabled: true,
-                dedupe: true
+                dedupe: true,
+                worldBooks: [],
+                assignedEntriesMap: {}
             });
-            WBAP.saveConfig();
             renderApiEndpoints();
             refreshSecondaryPromptUI();
         });
@@ -847,22 +797,6 @@
                     const currentConfig = WBAP.CharacterManager.getCurrentCharacterConfig();
                     const defaultConf = WBAP.createDefaultCharacterConfig ? WBAP.createDefaultCharacterConfig() : WBAP.DEFAULT_CONFIG;
 
-                    // 如果导入的配置中有旧格式的 apiEndpoints，迁移到全局池
-                    if (Array.isArray(importedConf.selectiveMode?.apiEndpoints)) {
-                        const globalEndpoints = getGlobalSelectiveEndpoints();
-                        importedConf.selectiveMode.apiEndpoints.forEach(ep => {
-                            normalizeEndpointStructure(ep);
-                            if (ep.timeout == null) ep.timeout = 60;
-                            // 检查是否已存在相同ID的端点
-                            const existingIndex = globalEndpoints.findIndex(e => e.id === ep.id);
-                            if (existingIndex === -1) {
-                                globalEndpoints.push(ep);
-                            }
-                        });
-                        // 删除旧格式字段
-                        delete importedConf.selectiveMode.apiEndpoints;
-                    }
-
                     // 清空当前配置并用导入的配置进行深度合并
                     Object.keys(currentConfig).forEach(key => delete currentConfig[key]);
                     Object.assign(currentConfig, {
@@ -872,6 +806,11 @@
                             ...defaultConf.selectiveMode,
                             ...(importedConf.selectiveMode || {})
                         },
+                    });
+                    // 兼容旧字段 url/key -> apiUrl/apiKey
+                    (currentConfig.selectiveMode.apiEndpoints || []).forEach(ep => {
+                        normalizeEndpointStructure(ep);
+                        if (ep.timeout == null) ep.timeout = 60;
                     });
 
                     WBAP.saveConfig();
@@ -1288,7 +1227,8 @@
     function renderOptimizationEndpointOptions(selectedId = null) {
         const selectEl = document.getElementById('wbap-optimization-endpoint-select');
         if (!selectEl) return;
-        const endpoints = getGlobalSelectiveEndpoints();
+        const config = WBAP.CharacterManager.getCurrentCharacterConfig();
+        const endpoints = config?.selectiveMode?.apiEndpoints || [];
         const enabledEndpoints = endpoints.filter(ep => ep && ep.enabled !== false);
 
         selectEl.innerHTML = '';
@@ -1773,8 +1713,7 @@
         if (!listContainer) return;
 
         const config = WBAP.CharacterManager.getCurrentCharacterConfig();
-        const endpoints = getGlobalSelectiveEndpoints();
-        const bindings = config?.selectiveMode?.endpointBindings || {};
+        const endpoints = config?.selectiveMode?.apiEndpoints || [];
         renderOptimizationEndpointOptions(config?.optimizationApiConfig?.selectedEndpointId || null);
 
         if (endpoints.length === 0) {
@@ -1782,18 +1721,12 @@
             return;
         }
 
-        listContainer.innerHTML = endpoints.map((ep) => {
-            const binding = bindings[ep.id] || {};
-            const worldBooks = Array.isArray(binding.worldBooks) ? binding.worldBooks : [];
-            const entriesMap = binding.assignedEntriesMap || {};
-            const entryCount = Object.values(entriesMap).reduce((sum, arr) => sum + (arr?.length || 0), 0);
-            const worldBookDisplay = worldBooks.length > 0 ? worldBooks.join(', ') : '未选择';
-            return `
+        listContainer.innerHTML = endpoints.map((ep) => `
             <div class="wbap-api-endpoint-item" data-id="${ep.id}">
                 <div class="wbap-api-endpoint-header">
                     <label style="display:flex; gap:8px; align-items:center;">
                         <input type="checkbox" class="wbap-endpoint-enabled" data-id="${ep.id}" ${ep.enabled === false ? '' : 'checked'}>
-                        <span>${ep.name}（${entryCount} 条，${worldBookDisplay}）</span>
+                        <span>${ep.name}（${(Object.values(ep.assignedEntriesMap || {}).reduce((sum, arr) => sum + (arr?.length || 0), 0) || ep.assignedEntries?.length || 0)} 条，${(Array.isArray(ep.worldBooks) ? ep.worldBooks : (ep.worldBook ? [ep.worldBook] : ['未选择'])).join(', ')}）</span>
                     </label>
                     <div>
                         <button class="wbap-btn wbap-btn-icon wbap-btn-xs" onclick="window.wbapEditEndpoint('${ep.id}')" title="编辑API实例">
@@ -1805,7 +1738,7 @@
                     </div>
                 </div>
             </div>
-        `}).join('');
+        `).join('');
 
         // 勾选状态变更
         listContainer.querySelectorAll('.wbap-endpoint-enabled').forEach(cb => {
@@ -1842,7 +1775,7 @@
             allowDuplicateEl.checked = cfg.aggregatorMode.allowDuplicate === true;
         }
 
-        const endpoints = getGlobalSelectiveEndpoints();
+        const endpoints = cfg?.selectiveMode?.apiEndpoints || [];
         endpointEl.innerHTML = '';
         if (endpoints.length === 0) {
             endpointEl.innerHTML = '<option value=\"\">请先新增 API 实例</option>';
@@ -3326,7 +3259,7 @@
     };
 
     window.wbapDeleteEndpoint = (id) => {
-        const endpoints = getGlobalSelectiveEndpoints();
+        const endpoints = WBAP.config.selectiveMode.apiEndpoints;
         const index = endpoints.findIndex(ep => ep.id === id);
         if (index > -1 && confirm('确定要删除这个API实例吗？')) {
             endpoints.splice(index, 1);
@@ -3364,14 +3297,14 @@
         delete endpoint.assignedEntries;
     }
 
-    function renderSelectedWorldbooks() {
+    function renderSelectedWorldbooks(endpoint) {
         const container = document.getElementById('wbap-endpoint-selected-worldbooks');
         if (!container) return;
-        if (!currentEditingBinding.worldBooks || currentEditingBinding.worldBooks.length === 0) {
+        if (!endpoint.worldBooks || endpoint.worldBooks.length === 0) {
             container.innerHTML = '<small class="wbap-text-muted">尚未选择世界书</small>';
             return;
         }
-        container.innerHTML = currentEditingBinding.worldBooks.map(name => `
+        container.innerHTML = endpoint.worldBooks.map(name => `
             <span class="wbap-tag" style="background: var(--wbap-bg-secondary, #2a2a3a); padding: 4px 8px; border-radius: 12px; display: inline-flex; align-items: center; gap: 6px;">
                 <span>${name}</span>
                 <button type="button" data-remove-book="${name}" class="wbap-btn wbap-btn-xs wbap-btn-icon" style="padding: 0 6px;">&times;</button>
@@ -3413,7 +3346,7 @@
         return trimmed || fallbackId || fallback;
     }
 
-    async function displayEntriesForBook(bookName) {
+    async function displayEntriesForBook(bookName, endpoint) {
         const entryList = document.getElementById('wbap-endpoint-edit-entry-list');
         if (!entryList) return;
 
@@ -3434,7 +3367,7 @@
             return;
         }
 
-        const selected = new Set(currentEditingBinding.assignedEntriesMap?.[bookName] || []);
+        const selected = new Set(endpoint.assignedEntriesMap?.[bookName] || []);
         const entries = Object.entries(book.entries).filter(([uid, entry]) => entry.disable !== true);
 
         if (entries.length === 0) {
@@ -3487,7 +3420,7 @@
     }
 
     // New function to render the list of worldbooks
-    function renderWorldBookList() {
+    function renderWorldBookList(endpoint) {
         const bookListContainer = document.getElementById('wbap-endpoint-book-list-container');
         const entryListContainer = document.getElementById('wbap-endpoint-edit-entry-list');
 
@@ -3496,23 +3429,23 @@
         bookListContainer.innerHTML = ''; // Clear previous list
         entryListContainer.innerHTML = '<p class="wbap-text-muted" style="text-align: center; font-size: 12px;">请从左侧选择一本世界书</p>'; // Reset entry list
 
-        if (!currentEditingBinding.worldBooks || currentEditingBinding.worldBooks.length === 0) {
+        if (!endpoint.worldBooks || endpoint.worldBooks.length === 0) {
             bookListContainer.innerHTML = '<p class="wbap-text-muted" style="padding: 8px; text-align: center; font-size: 12px;">请先添加世界书</p>';
             return;
         }
 
-        currentEditingBinding.worldBooks.forEach(bookName => {
+        endpoint.worldBooks.forEach(bookName => {
             const bookItem = document.createElement('div');
             bookItem.className = 'wbap-book-item';
             bookItem.textContent = bookName;
             bookItem.dataset.bookName = bookName;
-            bookItem.addEventListener('click', () => displayEntriesForBook(bookName));
+            bookItem.addEventListener('click', () => displayEntriesForBook(bookName, endpoint));
             bookListContainer.appendChild(bookItem);
         });
 
         // Automatically select the first book
-        if (currentEditingBinding.worldBooks.length > 0) {
-            displayEntriesForBook(currentEditingBinding.worldBooks[0]);
+        if (endpoint.worldBooks.length > 0) {
+            displayEntriesForBook(endpoint.worldBooks[0], endpoint);
         }
     }
 
@@ -3588,7 +3521,7 @@
 
         document.getElementById('wbap-endpoint-entries-select-all')?.addEventListener('click', () => {
             const checkboxes = document.querySelectorAll('#wbap-endpoint-edit-entry-list input[type="checkbox"]');
-            if (checkboxes.length === 0) return;
+            if (checkboxes.length === 0 || !currentEditingEndpoint) return;
 
             const bookName = checkboxes[0].dataset.book;
             const newIds = [];
@@ -3598,19 +3531,29 @@
             });
 
             if (bookName) {
-                if (!currentEditingBinding.assignedEntriesMap[bookName]) {
-                    currentEditingBinding.assignedEntriesMap[bookName] = [];
+                if (!currentEditingEndpoint.assignedEntriesMap[bookName]) {
+                    currentEditingEndpoint.assignedEntriesMap[bookName] = [];
                 }
-                const currentIds = new Set(currentEditingBinding.assignedEntriesMap[bookName]);
+                // Add all new IDs to the set (handling potential duplicates if any, though map replace is safer)
+                // Since we selected ALL visible entries for this book, and this list usually represents the *entire* list for this book,
+                // we can just set the map to these IDs? 
+                // Wait, renderWorldBookList filters entries? 
+                // Step 346 shows it might filter by columns ("best version of each entry").
+                // So we should probably merge with existing if the list is partial, or replace if it's full.
+                // But checking line 1562 in Step 346, it iterates `columnBest.entries()`. It seems to show all unique UIDs for the book.
+                // So replacing the list for this book with these IDs is correct.
+                // BUT, to be safe against partial rendering (if any), let's use a Set merge.
+
+                const currentIds = new Set(currentEditingEndpoint.assignedEntriesMap[bookName]);
                 newIds.forEach(id => currentIds.add(id));
-                currentEditingBinding.assignedEntriesMap[bookName] = Array.from(currentIds);
-                Logger.log(`全选已应用: 世界书=${bookName}, 总计=${currentEditingBinding.assignedEntriesMap[bookName].length}条`);
+                currentEditingEndpoint.assignedEntriesMap[bookName] = Array.from(currentIds);
+                Logger.log(`全选已应用: 世界书=${bookName}, 总计=${currentEditingEndpoint.assignedEntriesMap[bookName].length}条`);
             }
         });
 
         document.getElementById('wbap-endpoint-entries-clear')?.addEventListener('click', () => {
             const checkboxes = document.querySelectorAll('#wbap-endpoint-edit-entry-list input[type="checkbox"]');
-            if (checkboxes.length === 0) return;
+            if (checkboxes.length === 0 || !currentEditingEndpoint) return;
 
             const bookName = checkboxes[0].dataset.book;
             const idsToRemove = new Set();
@@ -3619,9 +3562,9 @@
                 idsToRemove.add(cb.value);
             });
 
-            if (bookName && currentEditingBinding.assignedEntriesMap[bookName]) {
-                currentEditingBinding.assignedEntriesMap[bookName] = currentEditingBinding.assignedEntriesMap[bookName].filter(id => !idsToRemove.has(id));
-                Logger.log(`清空已应用: 世界书=${bookName}, 剩余=${currentEditingBinding.assignedEntriesMap[bookName].length}条`);
+            if (bookName && currentEditingEndpoint.assignedEntriesMap[bookName]) {
+                currentEditingEndpoint.assignedEntriesMap[bookName] = currentEditingEndpoint.assignedEntriesMap[bookName].filter(id => !idsToRemove.has(id));
+                Logger.log(`清空已应用: 世界书=${bookName}, 剩余=${currentEditingEndpoint.assignedEntriesMap[bookName].length}条`);
             }
         });
 
@@ -3633,50 +3576,50 @@
 
         document.getElementById('wbap-endpoint-add-worldbook').addEventListener('click', () => {
             const select = document.getElementById('wbap-endpoint-edit-worldbook-select');
-            if (!select) return;
+            if (!select || !currentEditingEndpoint) return;
             const bookName = select.value;
             if (!bookName) {
                 alert('请先选择一个世界书');
                 return;
             }
-            if (!currentEditingBinding.worldBooks.includes(bookName)) {
-                currentEditingBinding.worldBooks.push(bookName);
+            if (!currentEditingEndpoint.worldBooks.includes(bookName)) {
+                currentEditingEndpoint.worldBooks.push(bookName);
             }
-            if (!currentEditingBinding.assignedEntriesMap[bookName]) {
-                currentEditingBinding.assignedEntriesMap[bookName] = [];
+            if (!currentEditingEndpoint.assignedEntriesMap[bookName]) {
+                currentEditingEndpoint.assignedEntriesMap[bookName] = [];
             }
-            renderSelectedWorldbooks();
-            renderWorldBookList();
+            renderSelectedWorldbooks(currentEditingEndpoint);
+            renderWorldBookList(currentEditingEndpoint);
         });
 
         document.getElementById('wbap-endpoint-selected-worldbooks').addEventListener('click', (e) => {
             const btn = e.target.closest('[data-remove-book]');
-            if (!btn) return;
+            if (!btn || !currentEditingEndpoint) return;
             const bookName = btn.dataset.removeBook;
-            currentEditingBinding.worldBooks = currentEditingBinding.worldBooks.filter(n => n !== bookName);
-            delete currentEditingBinding.assignedEntriesMap[bookName];
-            renderSelectedWorldbooks();
-            renderWorldBookList();
+            currentEditingEndpoint.worldBooks = currentEditingEndpoint.worldBooks.filter(n => n !== bookName);
+            delete currentEditingEndpoint.assignedEntriesMap[bookName];
+            renderSelectedWorldbooks(currentEditingEndpoint);
+            renderWorldBookList(currentEditingEndpoint);
         });
 
         document.getElementById('wbap-endpoint-edit-entry-list').addEventListener('change', (e) => {
-            if (e.target.type === 'checkbox') {
+            if (e.target.type === 'checkbox' && currentEditingEndpoint) {
                 const bookName = e.target.dataset.book;
                 const entryId = e.target.value;
                 if (!bookName || !entryId) return;
 
-                if (!currentEditingBinding.assignedEntriesMap[bookName]) {
-                    currentEditingBinding.assignedEntriesMap[bookName] = [];
+                if (!currentEditingEndpoint.assignedEntriesMap[bookName]) {
+                    currentEditingEndpoint.assignedEntriesMap[bookName] = [];
                 }
 
-                const selectedSet = new Set(currentEditingBinding.assignedEntriesMap[bookName]);
+                const selectedSet = new Set(currentEditingEndpoint.assignedEntriesMap[bookName]);
                 if (e.target.checked) {
                     selectedSet.add(entryId);
                 } else {
                     selectedSet.delete(entryId);
                 }
-                currentEditingBinding.assignedEntriesMap[bookName] = Array.from(selectedSet);
-                Logger.log(`条目选择已更新: 世界书=${bookName}, 选中=${currentEditingBinding.assignedEntriesMap[bookName].length}条`);
+                currentEditingEndpoint.assignedEntriesMap[bookName] = Array.from(selectedSet);
+                Logger.log(`条目选择已更新: 世界书=${bookName}, 选中=${currentEditingEndpoint.assignedEntriesMap[bookName].length}条`);
             }
         });
     }
@@ -3686,21 +3629,24 @@
         const modal = document.getElementById('wbap-endpoint-editor-modal');
         if (!modal) return;
 
-        // 从全局池获取端点
-        const endpoints = getGlobalSelectiveEndpoints();
+        // 确保结构存在
+        if (!WBAP.config.selectiveMode) {
+            WBAP.config.selectiveMode = { apiEndpoints: [] };
+        }
+        if (!Array.isArray(WBAP.config.selectiveMode.apiEndpoints)) {
+            WBAP.config.selectiveMode.apiEndpoints = [];
+        }
 
-        let endpoint = endpoints.find(ep => ep.id === id);
-        if (!endpoint && endpoints.length > 0) {
+        let endpoint = WBAP.config.selectiveMode.apiEndpoints.find(ep => ep.id === id);
+        if (!endpoint && WBAP.config.selectiveMode.apiEndpoints.length > 0) {
             // id 可能过期，回退到第一个
-            endpoint = endpoints[0];
+            endpoint = WBAP.config.selectiveMode.apiEndpoints[0];
         }
         if (!endpoint) {
             // Create default endpoint when list is empty
             endpoint = {
                 id: `ep_${Date.now()}`,
                 name: 'New API',
-                apiChannel: 'direct',
-                apiProvider: 'openai',
                 apiUrl: '',
                 apiKey: '',
                 model: '',
@@ -3713,19 +3659,15 @@
                 retryDelayMs: 800,
                 timeout: WBAP.mainConfig?.globalSettings?.timeout || 60,
                 enabled: true,
-                dedupe: true
+                dedupe: true,
+                worldBooks: [],
+                assignedEntriesMap: {}
             };
-            endpoints.push(endpoint);
+            WBAP.config.selectiveMode.apiEndpoints.push(endpoint);
             WBAP.saveConfig();
         }
+        normalizeEndpointStructure(endpoint);
         currentEditingEndpoint = endpoint;
-
-        // 从角色配置加载世界书绑定
-        const binding = getEndpointBinding(endpoint.id);
-        currentEditingBinding = {
-            worldBooks: [...binding.worldBooks],
-            assignedEntriesMap: JSON.parse(JSON.stringify(binding.assignedEntriesMap))
-        };
 
         // 填充基础信息
         document.getElementById('wbap-endpoint-editor-title').textContent = `编辑 API: ${endpoint.name}`;
@@ -3790,8 +3732,8 @@
             worldbookSelect.appendChild(option);
         });
 
-        renderSelectedWorldbooks();
-        renderWorldBookList();
+        renderSelectedWorldbooks(endpoint);
+        renderWorldBookList(endpoint);
 
         modal.classList.add('open');
         syncMobileRootFix();
@@ -3799,8 +3741,7 @@
 
     function saveEndpoint() {
         const id = document.getElementById('wbap-endpoint-edit-id').value;
-        const endpoints = getGlobalSelectiveEndpoints();
-        const endpoint = endpoints.find(ep => ep.id === id);
+        const endpoint = WBAP.config.selectiveMode.apiEndpoints.find(ep => ep.id === id);
         if (!endpoint) return;
 
         endpoint.name = document.getElementById('wbap-endpoint-edit-name').value;
@@ -3824,22 +3765,21 @@
         endpoint.enabled = document.getElementById('wbap-endpoint-edit-enabled')?.checked !== false;
         endpoint.dedupe = document.getElementById('wbap-endpoint-edit-dedupe')?.checked !== false;
 
-        // Clean up old fields from endpoint (these are now stored in character config bindings)
+        // The assignedEntriesMap is now updated live by a 'change' listener,
+        // so we just need to ensure the worldBooks array is clean.
+        endpoint.worldBooks = Array.isArray(endpoint.worldBooks) ? Array.from(new Set(endpoint.worldBooks)) : [];
+
+        // Clean up old fields to avoid confusion
         delete endpoint.url;
         delete endpoint.key;
         delete endpoint.worldBook;
         delete endpoint.assignedEntries;
-        delete endpoint.worldBooks;
-        delete endpoint.assignedEntriesMap;
-
-        // 保存世界书绑定到角色配置
-        setEndpointBinding(id, currentEditingBinding.worldBooks, currentEditingBinding.assignedEntriesMap);
 
         WBAP.saveConfig();
         document.getElementById('wbap-endpoint-editor-modal').classList.remove('open');
         WBAP.UI.renderApiEndpoints(); // Refresh the list in the settings view
         syncMobileRootFix();
-        Logger.log(`API instance "${endpoint.name}" saved with ${currentEditingBinding.worldBooks.length} worldbooks`);
+        Logger.log(`API instance "${endpoint.name}" saved`);
     }
 
     // 在脚本加载后立即尝试注入UI

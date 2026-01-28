@@ -3,7 +3,7 @@
 (function () {
     'use strict';
 
-    // 确保全局命名空间存在
+    // 纭繚鍏ㄥ眬鍛藉悕绌洪棿瀛樺湪
     window.WBAP = window.WBAP || {};
     const Logger = WBAP.Logger;
 
@@ -12,7 +12,7 @@
             try {
                 return AbortSignal.timeout(ms);
             } catch (e) {
-                // 某些环境可能抛错，继续使用备用方案
+                // 鏌愪簺鐜涓嬩細鎶涢敊锛岀户缁娇鐢ㄥ洖閫€鏂规
             }
         }
         const controller = new AbortController();
@@ -54,13 +54,13 @@
     async function getAllWorldBookNames() {
         try {
             if (Array.isArray(window.world_names)) {
-                Logger.log(`通过 window.world_names 获取到 ${window.world_names.length} 本世界书`);
+                Logger.log(`閫氳繃 window.world_names 鑾峰彇鍒?${window.world_names.length} 鏈笘鐣屼功`);
                 return [...window.world_names];
             }
             if (typeof SillyTavern !== 'undefined' && SillyTavern.getContext) {
                 const context = SillyTavern.getContext();
                 if (Array.isArray(context.worldNames)) {
-                    Logger.log(`通过 context.worldNames 获取到 ${context.worldNames.length} 本世界书`);
+                    Logger.log(`閫氳繃 context.worldNames 鑾峰彇鍒?${context.worldNames.length} 鏈笘鐣屼功`);
                     return [...context.worldNames];
                 }
             }
@@ -70,21 +70,21 @@
                 const names = [];
                 options.forEach(opt => {
                     const name = opt.textContent?.trim();
-                    // 过滤 None / none 等占位选项
-                    const normalized = (name || '').toLowerCase().replace(/[\s]/g, '');
+                    // 杩囨护 None / 鈥?None 鈥?鍗犱綅椤癸紙鍏ㄨ銆佸崐瑙掔牬鎶樺彿鍧囬€傞厤锛?
+                    const normalized = (name || '').toLowerCase().replace(/[\s鈥?]/g, '');
                     if (name && normalized !== '' && normalized !== 'none') {
                         names.push(name);
                     }
                 });
                 if (names.length > 0) {
-                    Logger.log(`通过 DOM #world_info 获取到 ${names.length} 本世界书`);
+                    Logger.log(`閫氳繃 DOM #world_info 鑾峰彇鍒?${names.length} 鏈笘鐣屼功`);
                     return names;
                 }
             }
-            Logger.warn('无法获取世界书列表');
+            Logger.warn('鏃犳硶鑾峰彇涓栫晫涔﹀垪琛?');
             return [];
         } catch (e) {
-            Logger.error('获取世界书列表时发生错误:', e);
+            Logger.error('鑾峰彇涓栫晫涔﹀垪琛ㄦ椂鍙戠敓閿欒:', e);
             return [];
         }
     }
@@ -107,9 +107,9 @@
                 const data = await response.json();
                 if (data && data.entries) return data;
             }
-            throw new Error('无法通过 Context API 或 Fetch API 加载世界书条目');
+            throw new Error('鏃犳硶閫氳繃 Context API 鎴?Fetch API 鍔犺浇涓栫晫涔︽潯鐩?');
         } catch (e) {
-            Logger.error(`加载世界书条目 "${name}" 失败:`, e);
+            Logger.error(`鍔犺浇涓栫晫涔︽潯鐩?"${name}" 澶辫触:`, e);
             return null;
         }
     }
@@ -128,27 +128,27 @@
             }
             return null;
         } catch (e) {
-            Logger.error(`加载世界书 "${name}" 失败:`, e);
+            Logger.error(`鍔犺浇涓栫晫涔?"${name}" 澶辫触:`, e);
             return null;
         }
     }
 
-    // 辅助函数：解析 API 错误
+    // 杈呭姪鍑芥暟锛氳В鏋?API 閿欒
     async function parseApiError(response) {
         const text = await response.text();
         try {
             const json = JSON.parse(text);
             if (json.error && json.error.message) {
-                return json.error.message; // OpenAI 格式
+                return json.error.message; // OpenAI 鏍煎紡
             }
             if (json.message) {
-                return json.message; // 通用格式
+                return json.message; // 閫氱敤鏍煎紡
             }
         } catch (e) {
-            // 如果不是 JSON，则返回部分文本
+            // 濡傛灉涓嶆槸 JSON锛岃繑鍥為儴鍒嗘枃鏈?
             return text.slice(0, 100) + (text.length > 100 ? '...' : '');
         }
-        return text; // 返回原始文本（若无法解析）
+        return text; // 杩斿洖鍘熷鏂囨湰锛堝鏋滄棤娉曡В鏋愶級
     }
 
     const inFlightRequests = new Map();
@@ -192,10 +192,10 @@
 
         const executeRequest = async () => {
             let apiUrl = apiConfig?.apiUrl || apiConfig?.url;
-            if (!modelName && apiUrl) throw new Error('模型名称不能为空');
+            if (!modelName && apiUrl) throw new Error('妯″瀷鍚嶇О涓嶈兘涓虹┖');
             const apiKey = apiConfig?.apiKey || apiConfig?.key;
             const timeoutSec = (apiConfig?.timeout && apiConfig.timeout > 0) ? apiConfig.timeout : 60;
-            const maxRetries = Number.isInteger(apiConfig?.maxRetries) ? Math.max(0, apiConfig.maxRetries) : 2; // 默认增加重试次数
+            const maxRetries = Number.isInteger(apiConfig?.maxRetries) ? Math.max(0, apiConfig.maxRetries) : 2; // 榛樿澧炲姞閲嶈瘯娆℃暟
             const baseRetryDelay = apiConfig?.retryDelayMs ?? 1000;
             const onProgress = (typeof apiConfig?.onProgress === 'function') ? apiConfig.onProgress : null;
             const onToken = (typeof apiConfig?.onToken === 'function') ? apiConfig.onToken : null;
@@ -206,31 +206,31 @@
 
             const sleep = (ms) => new Promise(res => setTimeout(res, ms));
 
-            // 智能重试判断
+            // 鏅鸿兘閲嶈瘯鍒ゆ柇
             const shouldRetry = (err, status, attempt) => {
                 if (attempt >= maxRetries) return false;
-                if (err?.name === 'AbortError') return false; // 用户主动取消不重试
+                if (err?.name === 'AbortError') return false; // 鐢ㄦ埛涓诲姩鍙栨秷涓嶉噸璇?
 
-                // 网络错误(status==0或undefined) -> 重试
+                // 缃戠粶閿欒 (status === 0 鎴?undefined) -> 閲嶈瘯
                 if (!status || status === 0) return true;
 
-                // 429 Too Many Requests -> 重试
+                // 429 Too Many Requests -> 閲嶈瘯
                 if (status === 429) return true;
 
-                // 5xx Server Errors -> 重试 (500, 502, 503, 504)
+                // 5xx Server Errors -> 閲嶈瘯 (500, 502, 503, 504)
                 if (status >= 500) return true;
 
                 return false;
             };
 
-            // 计算指数退避的等待时间
+            // 璁＄畻甯︽姈鍔ㄧ殑閫€閬挎椂闂?
             const getBackoffDelay = (attempt) => {
                 const exp = Math.pow(2, attempt);
                 const jitter = Math.random() * 0.5 + 0.5; // 0.5 ~ 1.0 jitter
-                return Math.min(baseRetryDelay * exp * jitter, 10000); // 上限 10s
+                return Math.min(baseRetryDelay * exp * jitter, 10000); // 涓婇檺 10绉?
             };
 
-            // 组合信号
+            // 缁勫悎淇″彿
             const baseTimeoutSignal = createTimeoutSignal(timeoutSec * 1000);
             let mergedSignal = baseTimeoutSignal;
             if (apiConfig?.signal) {
@@ -246,7 +246,7 @@
             }
 
             if (!apiUrl && useStBackend) {
-                throw new Error('未配置 API URL，无法使用 SillyTavern 后端通道');
+                throw new Error('鏈厤缃?API URL锛屾棤娉曚娇鐢?SillyTavern 鍚庣閫氶亾');
             }
 
             if (!apiUrl) {
@@ -254,8 +254,8 @@
                 if (typeof SillyTavern !== 'undefined' && typeof SillyTavern.getContext === 'function') {
                     const context = SillyTavern.getContext();
                     if (context && context.generate) {
-                        const displayModel = modelName || '默认模型';
-                        Logger.log(`使用 SillyTavern 内置 API (${displayModel})`);
+                        const displayModel = modelName || '榛樿妯″瀷';
+                        Logger.log(`浣跨敤 SillyTavern 鍐呯疆 API (${displayModel})`);
                         const messages = [];
                         if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
                         messages.push({ role: 'user', content: prompt });
@@ -265,7 +265,7 @@
                         return result;
                     }
                 }
-                throw new Error('未配置 API 且无法获取 SillyTavern API');
+                throw new Error('鏈厤缃?API 涓旀棤娉曡幏鍙?SillyTavern API');
             }
             const messages = [];
             if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
@@ -370,7 +370,7 @@
                         headers: buildHeaders(enableStreaming),
                         body: JSON.stringify(buildBody(enableStreaming)),
                         signal: mergedSignal
-                        // 移除可能导致 Network Error 的无效选项 (keepalive, mode: cors 等)
+                        // 绉婚櫎鍙兘瀵艰嚧 Network Error 鐨勪弗鏍奸€夐」 (keepalive, mode: cors绛?
                     };
                     fetchOptions.priority = apiConfig?.priority || 'high';
 
@@ -380,15 +380,15 @@
 
                     if (!response.ok) {
                         const errorMsg = await parseApiError(response);
-                        // 抛出非 2xx 状态码的错误，便于 catch 处理
+                        // 鎶涘嚭甯︾姸鎬佺爜鐨勯敊璇紝浠ヤ究 catch 鍧楁崟鑾峰鐞?
                         const err = new Error(`HTTP ${response.status}: ${errorMsg}`);
                         err.status = response.status;
                         throw err;
                     }
 
-                    // === 成功响应处理 ===
+                    // === 鎴愬姛鍝嶅簲澶勭悊 ===
 
-                    // 处理流式
+                    // 澶勭悊娴佸紡
                     const contentType = response.headers.get('content-type') || '';
                     const isJsonResponse = isJsonContentType(contentType);
                     const canStream = enableStreaming && response.body && typeof response.body.getReader === 'function';
@@ -431,7 +431,7 @@
                         }
                     }
 
-                    // 处理非流式 JSON
+                    // 澶勭悊闈炴祦寮?JSON
                     const content = await parseNonStreamResponse(response);
                     if (!content) {
                         throw new Error('Empty response body');
@@ -446,17 +446,17 @@
                     if (shouldRetry(err, status, attempt)) {
                         attempt++;
                         const delay = getBackoffDelay(attempt);
-                        Logger.warn(`API 异常 (${status || 'Network Error'}), 重试 ${attempt}/${maxRetries} ，等待 ${Math.round(delay)}ms...`);
-                        Logger.debug(`详细错误: ${err.message}`);
+                        Logger.warn(`API 寮傚父 (${status || 'Network Error'}), 閲嶈瘯 ${attempt}/${maxRetries} 鍚庣瓑寰?${Math.round(delay)}ms...`);
+                        Logger.debug(`璇︾粏閿欒: ${err.message}`);
                         await sleep(delay);
                         continue;
                     }
 
-                    // 最终失败
+                    // 褰诲簳澶辫触
                     if (err?.name !== 'AbortError') {
                         updateEndpointStats(endpointKey, { success: false });
                     }
-                    Logger.error(`API 调用最终失败: ${err.message}`);
+                    Logger.error(`API 璋冪敤鏈€缁堝け璐? ${err.message}`);
                     throw err;
                 }
             }
@@ -480,7 +480,7 @@
         }
     }
 
-    // 辅助：解析非流式响应
+    // 杈呭姪锛氳В鏋愰潪娴佸紡鍝嶅簲
     function extractTextFromPayload(payload) {
         if (payload == null) return '';
         if (typeof payload === 'string') return payload;
@@ -554,10 +554,10 @@
         }
         if (typeof data.content === 'string') return data.content;
         if (typeof data === 'string') return data;
-        throw new Error('未知的响应格式');
+        throw new Error('鏈煡鐨勫搷搴旀牸寮?');
     }
 
-    // 辅助：读取流
+    // 杈呭姪锛氳鍙栨祦
     function isJsonContentType(value = '') {
         return /application\/json|text\/json|application\/problem\+json/i.test(value || '');
     }
@@ -602,7 +602,7 @@
                 buffer += chunk;
 
                 const lines = buffer.split('\n');
-                buffer = lines.pop() || ''; // 保留未完成的行
+                buffer = lines.pop() || ''; // 淇濈暀鏈畬鎴愮殑琛?
 
                 for (const line of lines) {
                     const trimmed = line.trim();
@@ -648,33 +648,33 @@
             } catch (e) { }
         }
 
-        if (!content) throw new Error('流式响应为空');
+        if (!content) throw new Error('娴佸紡鍝嶅簲涓虹┖');
         if (onProgress) onProgress(100);
         return content;
     }
 
     async function testEndpointConnection(apiConfig) {
-        // 校验必填字段
+        // 楠岃瘉蹇呭～瀛楁
         const apiUrl = apiConfig?.apiUrl || apiConfig?.url;
         const apiKey = apiConfig?.apiKey || apiConfig?.key;
         const model = apiConfig?.model;
 
         if (!apiUrl || apiUrl.trim() === '') {
-            return { success: false, message: '请先填写 API URL' };
+            return { success: false, message: '璇峰厛濉啓 API URL' };
         }
         if (!apiKey || apiKey.trim() === '') {
-            return { success: false, message: '请先填写 API Key' };
+            return { success: false, message: '璇峰厛濉啓 API Key' };
         }
         if (!model || model.trim() === '') {
-            return { success: false, message: '请先填写模型名称' };
+            return { success: false, message: '璇峰厛濉啓妯″瀷鍚嶇О' };
         }
 
         try {
-            const response = await callAI(model, '这是一条连通性测试消息', 'You are a test assistant.', apiConfig);
+            const response = await callAI(model, '鍔犺棨鎯犲悜浣犲懠鍙紒', 'You are a test assistant.', apiConfig);
             if (response) {
                 return { success: true, message: 'Test succeeded.' };
             }
-            return { success: false, message: '响应为空' };
+            return { success: false, message: '鍝嶅簲涓虹┖' };
         } catch (e) {
             return { success: false, message: e.message };
         }
@@ -743,7 +743,7 @@
         }
     }
 
-    // ========== 预连接(Preconnect) ==========
+    // ========== 棰勮繛鎺?(Preconnect) ==========
     const preconnectedHosts = new Set();
     function setupPreconnect(endpoints) {
         if (!Array.isArray(endpoints)) return;
@@ -764,12 +764,12 @@
                 link.href = host;
                 link.crossOrigin = 'anonymous';
                 document.head.appendChild(link);
-                Logger.log(`预连接已添加: ${host}`);
+                Logger.log(`棰勮繛鎺ュ凡娣诲姞: ${host}`);
             } catch (e) { /* ignore invalid URLs */ }
         });
     }
 
-    // ========== 延迟测速 (Latency Measurement) ==========
+    // ========== 寤惰繜娴嬮噺 (Latency Measurement) ==========
     const latencyScores = new Map(); // endpointId -> { latency, timestamp }
     const endpointStats = new Map(); // endpointId -> stats
     const LATENCY_TTL = 5 * 60 * 1000; // 5 minutes
@@ -925,7 +925,7 @@
         await Promise.all(endpoints.map(ep => measureLatency(ep)));
     }
 
-    // ========== 响应缓存 (Response Cache) ==========
+    // ========== 鍝嶅簲缂撳瓨 (Response Cache) ==========
     const responseCache = new Map();
     const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
     const CACHE_MAX_SIZE = 50;
@@ -948,7 +948,7 @@
             responseCache.delete(key);
             return null;
         }
-        Logger.log(`缓存命中: ${key}`);
+        Logger.log(`缂撳瓨鍛戒腑: ${key}`);
         return entry.response;
     }
 
@@ -962,17 +962,17 @@
 
     function clearResponseCache() {
         responseCache.clear();
-        Logger.log('响应缓存宸叉竻绌?');
+        Logger.log('鍝嶅簲缂撳瓨宸叉竻绌?');
     }
 
-    // 挂载函数到全局命名空间
+    // 鏆撮湶鍑芥暟鍒板叏灞€鍛藉悕绌洪棿
     window.WBAP.getAllWorldBookNames = getAllWorldBookNames;
     window.WBAP.loadWorldBookEntriesByName = loadWorldBookEntriesByName;
     window.WBAP.loadWorldBookByName = loadWorldBookByName;
     window.WBAP.callAI = callAI;
     window.WBAP.testEndpointConnection = testEndpointConnection;
     window.WBAP.fetchEndpointModels = fetchEndpointModels;
-    // 新增导出
+    // 鏂板瀵煎嚭
     window.WBAP.setupPreconnect = setupPreconnect;
     window.WBAP.measureLatency = measureLatency;
     window.WBAP.getEndpointLatency = getEndpointLatency;
@@ -986,10 +986,6 @@
     window.WBAP.clearResponseCache = clearResponseCache;
 
 })();
-
-
-
-
 
 
 
