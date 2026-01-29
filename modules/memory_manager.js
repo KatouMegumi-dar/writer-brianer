@@ -1243,44 +1243,95 @@
         }
 
         const preset = await ensureDefaultPreset(mem);
-        const tasks = [];
 
-        // 收集总结书任务
+        // 收集任务信息（用于进度条显示）
+        const taskInfos = [];
+
+        // 收集总结书任务信息
         for (const summaryName of mem.selectedSummaryBooks || []) {
             const ep = findEndpointById(mem.summaryEndpoints?.[summaryName]);
-            tasks.push((async () => {
-                const content = await buildWorldbookContent([summaryName]);
-                const block = buildMemoryBlock({ userInput, context, worldbookContent: content, tableContent: '', preset });
-                block.model = mem.model;
-                return callMemoryEndpoint(block, ep, mem.model);
-            })());
+            taskInfos.push({
+                id: `memory-summary-${summaryName}`,
+                name: `总结: ${summaryName}`,
+                type: 'summary',
+                bookName: summaryName,
+                endpoint: ep
+            });
         }
 
-        // 收集表格书任务（需要先加载分类）
+        // 收集表格书任务信息（需要先加载分类）
         for (const bookName of mem.selectedTableBooks || []) {
             const categories = await loadTableCategories(bookName);
             for (const cat of categories) {
                 const epId = mem.tableCategoryEndpoints?.[bookName]?.[cat];
                 const ep = findEndpointById(epId);
-                tasks.push((async () => {
-                    const tableContent = await loadCategoryContent(bookName, cat);
-                    const block = buildMemoryBlock({ userInput, context, worldbookContent: '', tableContent, preset });
-                    block.model = mem.model;
-                    return callMemoryEndpoint(block, ep, mem.model);
-                })());
+                taskInfos.push({
+                    id: `memory-table-${bookName}-${cat}`,
+                    name: `表格: ${bookName}/${cat}`,
+                    type: 'table',
+                    bookName,
+                    category: cat,
+                    endpoint: ep
+                });
             }
         }
 
-        if (!tasks.length) {
+        if (!taskInfos.length) {
             const block = buildMemoryBlock({ userInput, context, worldbookContent: '', tableContent: '', preset });
             return `${block.system}\n\n${block.user}`;
         }
 
+        // 检查是否显示进度条
+        const config = getCharacterConfig();
+        const showProgress = config?.showProgressPanel && WBAP.UI;
+
+        if (showProgress) {
+            WBAP.UI.showProgressPanel('记忆模块处理中...', taskInfos.length);
+            for (const info of taskInfos) {
+                WBAP.UI.addProgressTask(info.id, info.name, '等待中...');
+            }
+        }
+
+        // 构建并执行任务
+        const taskPromises = taskInfos.map(async (info) => {
+            try {
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(info.id, '处理中...', 10);
+                }
+
+                let result = '';
+                if (info.type === 'summary') {
+                    const content = await buildWorldbookContent([info.bookName]);
+                    const block = buildMemoryBlock({ userInput, context, worldbookContent: content, tableContent: '', preset });
+                    block.model = mem.model;
+                    result = await callMemoryEndpoint(block, info.endpoint, mem.model);
+                } else {
+                    const tableContent = await loadCategoryContent(info.bookName, info.category);
+                    const block = buildMemoryBlock({ userInput, context, worldbookContent: '', tableContent, preset });
+                    block.model = mem.model;
+                    result = await callMemoryEndpoint(block, info.endpoint, mem.model);
+                }
+
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(info.id, '完成', 100);
+                }
+                return result;
+            } catch (e) {
+                Logger.error(TAG, 'memory task failed', info.name, e);
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(info.id, `失败: ${(e?.message || '').slice(0, 20)}`, 100);
+                }
+                return '';
+            }
+        });
+
         // 并发执行所有任务
-        const results = await Promise.all(tasks.map(t => t.catch(e => {
-            Logger.error(TAG, 'memory task failed', e);
-            return '';
-        })));
+        const results = await Promise.all(taskPromises);
+
+        // 隐藏进度条
+        if (showProgress) {
+            WBAP.UI.hideProgressPanel();
+        }
 
         // 智能去重合并
         const body = mergeMemoryResults(results);
