@@ -1963,7 +1963,7 @@
         descriptionArea.textContent = prompts[selectedIndex].description || '此预设没有描述。';
         if (bindingSummary) {
             const boundIds = Array.isArray(prompts[selectedIndex].boundEndpointIds) ? prompts[selectedIndex].boundEndpointIds.filter(Boolean) : [];
-            const endpoints = currentConfig?.selectiveMode?.apiEndpoints || [];
+            const endpoints = getGlobalSelectiveEndpoints();
             const nameMap = new Map(endpoints.map(ep => [ep.id, ep.name || ep.id]));
             if (boundIds.length === 0) {
                 bindingSummary.textContent = '未绑定 API（将使用所有已配置实例）。';
@@ -2088,7 +2088,7 @@
     function updatePromptBindingTags(selectedIds = [], endpoints = null) {
         const tagsEl = document.getElementById('wbap-prompt-bound-apis');
         if (!tagsEl) return;
-        const eps = endpoints || (WBAP.CharacterManager.getCurrentCharacterConfig()?.selectiveMode?.apiEndpoints || []);
+        const eps = endpoints || getGlobalSelectiveEndpoints();
         if (!selectedIds || selectedIds.length === 0) {
             tagsEl.innerHTML = '<small class="wbap-text-muted">未绑定（默认使用全部）</small>';
             return;
@@ -2103,8 +2103,7 @@
     function updateSecondaryBindingSummary(selectedIds = []) {
         const summaryEl = document.getElementById('wbap-secondary-binding-summary');
         if (!summaryEl) return;
-        const currentConfig = WBAP.CharacterManager.getCurrentCharacterConfig();
-        const endpoints = currentConfig?.selectiveMode?.apiEndpoints || [];
+        const endpoints = getGlobalSelectiveEndpoints();
         const map = new Map(endpoints.map(ep => [ep.id, ep.name || ep.id]));
         if (!selectedIds || selectedIds.length === 0) {
             summaryEl.textContent = '未绑定 API（将使用所有已配置实例）。';
@@ -2117,8 +2116,7 @@
     function renderSecondaryBindingList(selectedIds = []) {
         const listEl = document.getElementById('wbap-secondary-binding-list');
         if (!listEl) return;
-        const currentConfig = WBAP.CharacterManager.getCurrentCharacterConfig();
-        const endpoints = currentConfig?.selectiveMode?.apiEndpoints || [];
+        const endpoints = getGlobalSelectiveEndpoints();
         const selected = new Set(selectedIds);
         if (endpoints.length === 0) {
             listEl.innerHTML = '<small class="wbap-text-muted">暂无已配置的 API 实例。</small>';
@@ -2137,8 +2135,7 @@
     function renderPromptBindingList(selectedIds = []) {
         const listEl = document.getElementById('wbap-prompt-binding-list');
         if (!listEl) return;
-        const currentConfig = WBAP.CharacterManager.getCurrentCharacterConfig();
-        const endpoints = currentConfig?.selectiveMode?.apiEndpoints || [];
+        const endpoints = getGlobalSelectiveEndpoints();
         const selected = new Set(selectedIds);
         if (endpoints.length === 0) {
             listEl.innerHTML = '<small class="wbap-text-muted">暂无已配置的 API 实例。</small>';
@@ -2159,8 +2156,7 @@
     function updatePromptBindingSummary(selectedIds = []) {
         const bindingSummary = document.getElementById('wbap-prompt-binding-summary');
         if (!bindingSummary) return;
-        const currentConfig = WBAP.CharacterManager ? WBAP.CharacterManager.getCurrentCharacterConfig() : WBAP.config;
-        const endpoints = currentConfig?.selectiveMode?.apiEndpoints || [];
+        const endpoints = getGlobalSelectiveEndpoints();
         const nameMap = new Map(endpoints.map(ep => [ep.id, ep.name || ep.id]));
         if (selectedIds.length === 0) {
             bindingSummary.textContent = '未绑定 API（将使用所有已配置实例）。';
