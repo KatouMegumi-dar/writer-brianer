@@ -1180,44 +1180,228 @@
         return (m ? m[1] : text).trim();
     }
 
-    // 智能去重合并结果
-    function mergeMemoryResults(pieces) {
-        const seen = new Set();
-        const uniqueLines = [];
+    // 占位符文本，用于过滤无效内容
+    const PLACEHOLDER_TEXTS = [
+        '未勾选总结世界书或未启用世界书',
+        '未检索出历史事件回忆',
+        '记忆管理未启用表格',
+        '未检索出表格总结',
+        '当前无明确人物状态信息',
+        '当前无明确未竟之事'
+    ];
 
-        for (const piece of pieces) {
-            const content = extractMemoryContent(piece);
-            if (!content) continue;
+    // 从输出中提取特定标签的内容
+    function extractTagContent(text, tagName) {
+        const regex = new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, 'i');
+        const match = text.match(regex);
+        if (!match) return null;
 
-            const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
-            for (const line of lines) {
-                // 跳过完全相同的行
-                if (seen.has(line)) continue;
+        let content = match[1].trim();
+        // 移除固定输出字段前缀
+        content = content.replace(/^以下是[^：:]+[：:]\s*/i, '').trim();
 
-                // 检查是否被已有内容包含（子串去重）
-                let isDuplicate = false;
-                for (const existing of seen) {
-                    // 如果新行被已有行包含，跳过
-                    if (existing.length > line.length && existing.includes(line)) {
-                        isDuplicate = true;
-                        break;
-                    }
-                    // 如果新行包含已有行，移除已有行
-                    if (line.length > existing.length && line.includes(existing)) {
-                        seen.delete(existing);
-                        const idx = uniqueLines.indexOf(existing);
-                        if (idx !== -1) uniqueLines.splice(idx, 1);
-                    }
-                }
-
-                if (!isDuplicate) {
-                    seen.add(line);
-                    uniqueLines.push(line);
-                }
+        // 检查是否为占位符文本
+        for (const placeholder of PLACEHOLDER_TEXTS) {
+            if (content === placeholder || content.includes(placeholder)) {
+                // 如果只有占位符，返回 null
+                const withoutPlaceholder = content.replace(placeholder, '').trim();
+                if (!withoutPlaceholder) return null;
+                content = withoutPlaceholder;
             }
         }
 
-        return uniqueLines.join('\n');
+        return content || null;
+    }
+
+    // 提取推理说明（memory 块开头的 1-2 句话）
+    function extractReasoning(text) {
+        const content = extractMemoryContent(text);
+        if (!content) return null;
+
+        // 推理说明在 <Historical_Occurrences> 之前
+        const beforeHistory = content.split(/<Historical_Occurrences>/i)[0];
+        if (!beforeHistory) return null;
+
+        // 移除【注意】提示
+        let reasoning = beforeHistory.replace(/【注意】[^】]*。?/g, '').trim();
+        // 只取第一段（1-2句话）
+        const lines = reasoning.split('\n').filter(l => l.trim());
+        return lines[0]?.trim() || null;
+    }
+
+    // 提取近期剧情末尾片段（在 </Short_Term_Recall> 之后，</memory> 之前）
+    function extractRecentPlot(text) {
+        const content = extractMemoryContent(text);
+        if (!content) return null;
+
+        // 在 </Short_Term_Recall> 之后的内容
+        const afterRecall = content.split(/<\/Short_Term_Recall>/i)[1];
+        if (!afterRecall) return null;
+
+        let plot = afterRecall.trim();
+        // 移除固定输出字段
+        plot = plot.replace(/^以下是近期剧情末尾片段[：:]\s*/i, '').trim();
+        plot = plot.replace(/【注意】后续剧情应衔接开始而非复述。?\s*$/i, '').trim();
+
+        return plot || null;
+    }
+
+    // 结构化提取单个任务的输出
+    function extractStructuredContent(text, taskType) {
+        const result = {
+            reasoning: null,
+            historicalOccurrences: null,
+            tableSummary: null,
+            characterSnapshot: null,
+            shortTermRecall: null,
+            recentPlot: null
+        };
+
+        if (!text) return result;
+
+        // 根据任务类型提取对应部分
+        if (taskType === 'snapshot') {
+            // 快照任务：提取高维快照、短期记忆、近期片段、推理说明
+            result.reasoning = extractReasoning(text);
+            result.characterSnapshot = extractTagContent(text, 'Character_Snapshot');
+            result.shortTermRecall = extractTagContent(text, 'Short_Term_Recall');
+            result.recentPlot = extractRecentPlot(text);
+        } else if (taskType === 'summary') {
+            // 总结书任务：只提取历史事件回忆
+            result.historicalOccurrences = extractTagContent(text, 'Historical_Occurrences');
+        } else if (taskType === 'table') {
+            // 表格书任务：只提取表格总结
+            result.tableSummary = extractTagContent(text, 'Table_Summary');
+        }
+
+        return result;
+    }
+
+    // 合并多个历史事件回忆，去重并按楼层排序
+    function mergeHistoricalOccurrences(items) {
+        if (!items || !items.length) return null;
+
+        const seen = new Set();
+        const records = [];
+
+        for (const item of items) {
+            if (!item) continue;
+            const lines = item.split('\n').filter(l => l.trim());
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || seen.has(trimmed)) continue;
+
+                // 提取楼层号用于排序
+                const floorMatch = trimmed.match(/【(\d+)楼】/);
+                const floor = floorMatch ? parseInt(floorMatch[1], 10) : 9999;
+
+                seen.add(trimmed);
+                records.push({ floor, text: trimmed });
+            }
+        }
+
+        // 按楼层排序
+        records.sort((a, b) => a.floor - b.floor);
+
+        // 重新编号
+        return records.map((r, i) => {
+            // 替换原有的 T-X 编号
+            return r.text.replace(/^T-\d+[：:]\s*/, `T-${i + 1}: `);
+        }).join('\n');
+    }
+
+    // 合并多个表格总结，去重
+    function mergeTableSummaries(items) {
+        if (!items || !items.length) return null;
+
+        const seen = new Set();
+        const records = [];
+
+        for (const item of items) {
+            if (!item) continue;
+            const lines = item.split('\n').filter(l => l.trim());
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || seen.has(trimmed)) continue;
+
+                seen.add(trimmed);
+                records.push(trimmed);
+            }
+        }
+
+        // 重新编号
+        return records.map((r, i) => {
+            return r.replace(/^H-\d+[：:]\s*/, `H-${i + 1}: `);
+        }).join('\n');
+    }
+
+    // 结构化合并所有任务结果
+    function mergeMemoryResults(snapshotResult, summaryResults, tableResults) {
+        // 从快照任务提取
+        const snapshot = extractStructuredContent(snapshotResult, 'snapshot');
+
+        // 从总结书任务提取历史事件
+        const historicalItems = summaryResults
+            .map(r => extractStructuredContent(r, 'summary').historicalOccurrences)
+            .filter(Boolean);
+
+        // 从表格书任务提取表格总结
+        const tableItems = tableResults
+            .map(r => extractStructuredContent(r, 'table').tableSummary)
+            .filter(Boolean);
+
+        // 合并历史事件和表格总结
+        const mergedHistory = mergeHistoricalOccurrences(historicalItems);
+        const mergedTable = mergeTableSummaries(tableItems);
+
+        // 构建最终输出
+        const parts = [];
+
+        // 开始 details/summary 包裹
+        parts.push('<details>');
+        parts.push('<summary>记忆召回</summary>');
+
+        // 推理说明
+        if (snapshot.reasoning) {
+            parts.push(snapshot.reasoning);
+        }
+
+        // 注意提示
+        parts.push('【注意】所有回忆为过去式，请勿将回忆中的任何状态理解为当前状态，仅作剧情参考。');
+
+        // 历史事件回忆
+        parts.push('<Historical_Occurrences>');
+        parts.push('以下是历史事件回忆：');
+        parts.push(mergedHistory || '未勾选总结世界书或未启用世界书');
+        parts.push('</Historical_Occurrences>');
+
+        // 表格总结
+        parts.push('<Table_Summary>');
+        parts.push('以下是表格总结：');
+        parts.push(mergedTable || '记忆管理未启用表格');
+        parts.push('</Table_Summary>');
+
+        // 高维快照
+        parts.push('<Character_Snapshot>');
+        parts.push('以下是高维快照：');
+        parts.push(snapshot.characterSnapshot || '当前无明确人物状态信息');
+        parts.push('</Character_Snapshot>');
+
+        // 短期记忆召回
+        parts.push('<Short_Term_Recall>');
+        parts.push('以下是短期记忆召回：');
+        parts.push(snapshot.shortTermRecall || '当前无明确未竟之事');
+        parts.push('</Short_Term_Recall>');
+
+        // 近期剧情末尾片段
+        parts.push('以下是近期剧情末尾片段：');
+        parts.push(snapshot.recentPlot || '');
+        parts.push('【注意】后续剧情应衔接开始而非复述。');
+
+        // 结束 details 包裹
+        parts.push('</details>');
+
+        return parts.join('\n');
     }
 
     async function callMemoryEndpoint(block, endpoint, modelOverride = '') {
@@ -1251,32 +1435,33 @@
         }
 
         const preset = await ensureDefaultPreset(mem);
+        const config = getCharacterConfig();
+        const showProgress = config?.showProgressPanel && WBAP.UI;
 
-        // 收集任务信息（用于进度条显示）
-        const taskInfos = [];
+        // 收集任务信息
+        const summaryTasks = [];
+        const tableTasks = [];
 
-        // 收集总结书任务信息
+        // 收集总结书任务
         for (const summaryName of mem.selectedSummaryBooks || []) {
             const ep = findEndpointById(mem.summaryEndpoints?.[summaryName]);
-            taskInfos.push({
+            summaryTasks.push({
                 id: `memory-summary-${summaryName}`,
                 name: `总结: ${summaryName}`,
-                type: 'summary',
                 bookName: summaryName,
                 endpoint: ep
             });
         }
 
-        // 收集表格书任务信息（需要先加载分类）
+        // 收集表格书任务
         for (const bookName of mem.selectedTableBooks || []) {
             const categories = await loadTableCategories(bookName);
             for (const cat of categories) {
                 const epId = mem.tableCategoryEndpoints?.[bookName]?.[cat];
                 const ep = findEndpointById(epId);
-                taskInfos.push({
+                tableTasks.push({
                     id: `memory-table-${bookName}-${cat}`,
                     name: `表格: ${bookName}/${cat}`,
-                    type: 'table',
                     bookName,
                     category: cat,
                     endpoint: ep
@@ -1284,65 +1469,126 @@
             }
         }
 
-        if (!taskInfos.length) {
-            const block = buildMemoryBlock({ userInput, context, worldbookContent: '', tableContent: '', preset });
-            return `${block.system}\n\n${block.user}`;
-        }
+        // 获取默认端点（用于快照任务）
+        const defaultEndpoint = findEndpointById(getMemoryPool().apiEndpoints?.[0]?.id);
 
-        // 检查是否显示进度条
-        const config = getCharacterConfig();
-        const showProgress = config?.showProgressPanel && WBAP.UI;
+        // 计算总任务数（快照任务 + 总结书任务 + 表格书任务）
+        const totalTasks = 1 + summaryTasks.length + tableTasks.length;
 
         if (showProgress) {
-            WBAP.UI.showProgressPanel('记忆模块处理中...', taskInfos.length);
-            for (const info of taskInfos) {
-                WBAP.UI.addProgressTask(info.id, info.name, '等待中...');
+            WBAP.UI.showProgressPanel('记忆模块处理中...', totalTasks);
+            // 添加快照任务
+            WBAP.UI.addProgressTask('memory-snapshot', '快照: 高维快照/短期记忆', '等待中...');
+            // 添加总结书任务
+            for (const task of summaryTasks) {
+                WBAP.UI.addProgressTask(task.id, task.name, '等待中...');
+            }
+            // 添加表格书任务
+            for (const task of tableTasks) {
+                WBAP.UI.addProgressTask(task.id, task.name, '等待中...');
             }
         }
 
-        // 构建并执行任务
-        const taskPromises = taskInfos.map(async (info) => {
+        // 创建快照任务（不传世界书和表格内容，只提取高维快照、短期记忆、近期片段）
+        const snapshotPromise = (async () => {
             try {
                 if (showProgress) {
-                    WBAP.UI.updateProgressTask(info.id, '处理中...', 10);
+                    WBAP.UI.updateProgressTask('memory-snapshot', '处理中...', 10);
                 }
-
-                let result = '';
-                if (info.type === 'summary') {
-                    const content = await buildWorldbookContent([info.bookName]);
-                    const block = buildMemoryBlock({ userInput, context, worldbookContent: content, tableContent: '', preset });
-                    block.model = mem.model;
-                    result = await callMemoryEndpoint(block, info.endpoint, mem.model);
-                } else {
-                    const tableContent = await loadCategoryContent(info.bookName, info.category);
-                    const block = buildMemoryBlock({ userInput, context, worldbookContent: '', tableContent, preset });
-                    block.model = mem.model;
-                    result = await callMemoryEndpoint(block, info.endpoint, mem.model);
-                }
-
+                const block = buildMemoryBlock({
+                    userInput,
+                    context,
+                    worldbookContent: '',  // 不传世界书
+                    tableContent: '',       // 不传表格
+                    preset
+                });
+                block.model = mem.model;
+                const result = await callMemoryEndpoint(block, defaultEndpoint, mem.model);
                 if (showProgress) {
-                    WBAP.UI.updateProgressTask(info.id, '完成', 100);
+                    WBAP.UI.updateProgressTask('memory-snapshot', '完成', 100);
                 }
                 return result;
             } catch (e) {
-                Logger.error(TAG, 'memory task failed', info.name, e);
+                Logger.error(TAG, 'snapshot task failed', e);
                 if (showProgress) {
-                    WBAP.UI.updateProgressTask(info.id, `失败: ${(e?.message || '').slice(0, 20)}`, 100);
+                    WBAP.UI.updateProgressTask('memory-snapshot', `失败: ${(e?.message || '').slice(0, 20)}`, 100);
+                }
+                return '';
+            }
+        })();
+
+        // 创建总结书任务
+        const summaryPromises = summaryTasks.map(async (task) => {
+            try {
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(task.id, '处理中...', 10);
+                }
+                const content = await buildWorldbookContent([task.bookName]);
+                const block = buildMemoryBlock({
+                    userInput,
+                    context,
+                    worldbookContent: content,
+                    tableContent: '',
+                    preset
+                });
+                block.model = mem.model;
+                const result = await callMemoryEndpoint(block, task.endpoint, mem.model);
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(task.id, '完成', 100);
+                }
+                return result;
+            } catch (e) {
+                Logger.error(TAG, 'summary task failed', task.name, e);
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(task.id, `失败: ${(e?.message || '').slice(0, 20)}`, 100);
+                }
+                return '';
+            }
+        });
+
+        // 创建表格书任务
+        const tablePromises = tableTasks.map(async (task) => {
+            try {
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(task.id, '处理中...', 10);
+                }
+                const tableContent = await loadCategoryContent(task.bookName, task.category);
+                const block = buildMemoryBlock({
+                    userInput,
+                    context,
+                    worldbookContent: '',
+                    tableContent,
+                    preset
+                });
+                block.model = mem.model;
+                const result = await callMemoryEndpoint(block, task.endpoint, mem.model);
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(task.id, '完成', 100);
+                }
+                return result;
+            } catch (e) {
+                Logger.error(TAG, 'table task failed', task.name, e);
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(task.id, `失败: ${(e?.message || '').slice(0, 20)}`, 100);
                 }
                 return '';
             }
         });
 
         // 并发执行所有任务
-        const results = await Promise.all(taskPromises);
+        const [snapshotResult, summaryResults, tableResults] = await Promise.all([
+            snapshotPromise,
+            Promise.all(summaryPromises),
+            Promise.all(tablePromises)
+        ]);
 
         // 隐藏进度条
         if (showProgress) {
             WBAP.UI.hideProgressPanel();
         }
 
-        // 智能去重合并
-        const body = mergeMemoryResults(results);
+        // 结构化合并结果
+        const body = mergeMemoryResults(snapshotResult, summaryResults, tableResults);
         if (!body) return '';
 
         return `<memory>\n${body}\n</memory>`;
