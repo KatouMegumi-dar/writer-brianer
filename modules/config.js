@@ -229,6 +229,7 @@
             analysisExcludeTags: '',
             tagExtractionName: '',
             showProgressPanel: true,
+            showFloatButton: true,
             enablePlotOptimization: false,
             enablePlotOptimizationFloatButton: false,
             optimizationSystemPrompt: '',

@@ -88,7 +88,10 @@
     }
 
     function ensureFloatButton() {
-        if (document.getElementById('wbap-float-btn')) return;
+        if (document.getElementById('wbap-float-btn')) {
+            updateFloatButtonVisibility();
+            return;
+        }
 
         const floatBtn = document.createElement('button');
         floatBtn.id = 'wbap-float-btn';
@@ -124,7 +127,64 @@
         };
 
         WBAP.makeDraggable(floatBtn, onClick, onDragEnd);
+        updateFloatButtonVisibility();
         Logger.log('悬浮按钮已注入');
+    }
+
+    // 根据配置更新悬浮球显示状态
+    function updateFloatButtonVisibility() {
+        const floatBtn = document.getElementById('wbap-float-btn');
+        if (!floatBtn) return;
+
+        const config = WBAP.CharacterManager?.getCurrentCharacterConfig?.() || {};
+        const shouldShow = config.showFloatButton !== false;
+        floatBtn.style.display = shouldShow ? '' : 'none';
+    }
+
+    // 在 SillyTavern 扩展菜单中添加按钮
+    function ensureExtensionsMenuButton() {
+        if (document.getElementById('wbap-extensions-menu-btn')) return;
+
+        const extensionsMenu = document.getElementById('extensionsMenu');
+        if (!extensionsMenu) {
+            Logger.log('扩展菜单未找到，稍后重试');
+            setTimeout(ensureExtensionsMenuButton, 1000);
+            return;
+        }
+
+        // 创建菜单项容器
+        const container = document.createElement('div');
+        container.id = 'wbap_wand_container';
+        container.className = 'extension_container';
+
+        // 创建按钮
+        const buttonHtml = `
+            <div id="wbap-extensions-menu-btn" class="list-group-item flex-container flexGap5 interactable">
+                <div class="fa-solid fa-cat extensionsMenuExtensionButton"></div>
+                <span>笔者之脑</span>
+            </div>
+        `;
+        container.innerHTML = buttonHtml;
+        extensionsMenu.appendChild(container);
+
+        // 绑定点击事件
+        document.getElementById('wbap-extensions-menu-btn')?.addEventListener('click', () => {
+            if (panelElement) {
+                document.body.classList.remove('wbap-mobile-settings-mode');
+                document.documentElement.classList.remove('wbap-mobile-settings-mode');
+                if (settingsElement) settingsElement.classList.remove('open');
+
+                panelElement.classList.toggle('open');
+                syncMobileRootFix();
+            }
+            // 关闭扩展菜单
+            const extensionsMenuEl = document.getElementById('extensionsMenu');
+            if (extensionsMenuEl) {
+                extensionsMenuEl.style.display = 'none';
+            }
+        });
+
+        Logger.log('扩展菜单按钮已注入');
     }
 
     function syncMobileRootFix() {
@@ -155,6 +215,7 @@
                 settingsElement = document.getElementById('wbap-settings');
                 tiagangElement = document.getElementById('wbap-tiagang-settings');
                 ensureFloatButton();
+                ensureExtensionsMenuButton();
 
                 const progress = ensureProgressPanel(templates);
                 bindProgressPanelEvents();
@@ -165,6 +226,9 @@
 
             // 注入悬浮按钮
             ensureFloatButton();
+
+            // 注入扩展菜单按钮
+            ensureExtensionsMenuButton();
 
             // 注入模板
             const panelDiv = document.createElement('div');
@@ -784,6 +848,8 @@
             WBAP.mainConfig.globalSettings = globalSettings;
 
             config.showProgressPanel = document.getElementById('wbap-settings-progress-panel')?.checked !== false;
+            config.showFloatButton = document.getElementById('wbap-settings-float-button')?.checked !== false;
+            updateFloatButtonVisibility();
             config.enablePlotOptimization = document.getElementById('wbap-settings-plot-optimization')?.checked === true;
             config.enablePlotOptimizationFloatButton = document.getElementById('wbap-settings-plot-optimization-fab')?.checked === true;
             const optimizationApiConfig = ensureOptimizationApiConfig(config);
@@ -1727,6 +1793,11 @@
         const showProgressPanelEl = document.getElementById('wbap-settings-progress-panel');
         if (showProgressPanelEl) {
             showProgressPanelEl.checked = config.showProgressPanel !== false;
+        }
+
+        const showFloatButtonEl = document.getElementById('wbap-settings-float-button');
+        if (showFloatButtonEl) {
+            showFloatButtonEl.checked = config.showFloatButton !== false;
         }
 
         const optimizationEl = document.getElementById('wbap-settings-plot-optimization');

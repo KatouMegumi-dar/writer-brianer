@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/silly/SillyTavern/public/scripts/extensions/third-party/memory-manager-concurrent/prompts/historical/**)"
+    ]
+  }
+}

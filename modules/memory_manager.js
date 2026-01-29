@@ -29,13 +29,23 @@
     const DEFAULT_VARIABLES = { sulv1: '0.6', sulv2: '8', sulv3: '6', sulv4: '' };
 
     const CATEGORY_CACHE = new Map();
+    const WORLDBOOK_TYPE_CACHE = new Map(); // 缓存世界书类型检测结果
     let defaultPresetPromise = null;
 
     function createDefaultMemoryEndpoint() {
         if (WBAP.createDefaultMemoryEndpoint) return WBAP.createDefaultMemoryEndpoint();
+
+        // 计算下一个编号
+        const pool = getGlobalPools()?.memory || { apiEndpoints: [] };
+        const existingNames = (pool.apiEndpoints || []).map(ep => ep.name || '');
+        let nextNum = 1;
+        while (existingNames.includes(`记忆API-${nextNum}`)) {
+            nextNum++;
+        }
+
         return {
             id: `mem_ep_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-            name: '记忆API-1',
+            name: `记忆API-${nextNum}`,
             apiUrl: '',
             apiKey: '',
             model: '',
@@ -293,15 +303,23 @@
         <strong>选择世界书（仅表格书 / 总结书）</strong>
         <span id="wbap-memory-loading" class="wbap-text-muted" style="display:none;"><i class="fa-solid fa-spinner fa-spin"></i> 加载中...</span>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
-        <div>
-          <div class="wbap-text-muted">表格书</div>
-          <div id="wbap-memory-table-list" class="wbap-list"></div>
-        </div>
-        <div>
-          <div class="wbap-text-muted">总结书</div>
-          <div id="wbap-memory-summary-list" class="wbap-list"></div>
-        </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+        <details class="wbap-collapsible">
+          <summary class="wbap-collapsible-header">
+            <i class="fa-solid fa-table"></i>
+            <span>表格书</span>
+            <span id="wbap-memory-table-count" class="wbap-badge wbap-badge-sm">0</span>
+          </summary>
+          <div id="wbap-memory-table-list" class="wbap-list" style="padding:8px 0 0 16px;"></div>
+        </details>
+        <details class="wbap-collapsible">
+          <summary class="wbap-collapsible-header">
+            <i class="fa-solid fa-book"></i>
+            <span>总结书</span>
+            <span id="wbap-memory-summary-count" class="wbap-badge wbap-badge-sm">0</span>
+          </summary>
+          <div id="wbap-memory-summary-list" class="wbap-list" style="padding:8px 0 0 16px;"></div>
+        </details>
       </div>
     </div>
 
@@ -309,17 +327,27 @@
       <div class="wbap-box-header" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <strong>已选 & API 配置</strong>
       </div>
-      <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div>
-          <div class="wbap-text-muted">表格书</div>
-          <div id="wbap-memory-selected-tables" class="wbap-tag-list"></div>
-          <div id="wbap-memory-table-config" style="margin-top:8px;"></div>
-        </div>
-        <div>
-          <div class="wbap-text-muted">总结书</div>
-          <div id="wbap-memory-selected-summaries" class="wbap-tag-list"></div>
-          <div id="wbap-memory-summary-config" style="margin-top:8px;"></div>
-        </div>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:8px;">
+        <details class="wbap-collapsible" open>
+          <summary class="wbap-collapsible-header">
+            <i class="fa-solid fa-table"></i>
+            <span>表格书配置</span>
+          </summary>
+          <div style="padding:8px 0 0 8px;">
+            <div id="wbap-memory-selected-tables" class="wbap-tag-list" style="margin-bottom:8px;"></div>
+            <div id="wbap-memory-table-config"></div>
+          </div>
+        </details>
+        <details class="wbap-collapsible" open>
+          <summary class="wbap-collapsible-header">
+            <i class="fa-solid fa-book"></i>
+            <span>总结书配置</span>
+          </summary>
+          <div style="padding:8px 0 0 8px;">
+            <div id="wbap-memory-selected-summaries" class="wbap-tag-list" style="margin-bottom:8px;"></div>
+            <div id="wbap-memory-summary-config"></div>
+          </div>
+        </details>
       </div>
     </div>
 
@@ -401,11 +429,11 @@
         <input type="number" id="wbap-memory-api-top" step="0.05" min="0" max="1" placeholder="1">
       </div>
       <div>
-        <label>Presence Penalty</label>
+        <label>存在惩罚</label>
         <input type="number" id="wbap-memory-api-presence" step="0.1" min="-2" max="2" placeholder="0">
       </div>
       <div>
-        <label>Frequency Penalty</label>
+        <label>频率惩罚</label>
         <input type="number" id="wbap-memory-api-frequency" step="0.1" min="-2" max="2" placeholder="0">
       </div>
       <div>
@@ -722,26 +750,57 @@
         }
     }
 
+    // 检测并缓存世界书类型
+    async function detectAndCacheWorldBookType(name) {
+        // 检查缓存
+        if (WORLDBOOK_TYPE_CACHE.has(name)) {
+            return WORLDBOOK_TYPE_CACHE.get(name);
+        }
+
+        try {
+            const meta = await loadWorldBookMeta(name);
+            if (!meta) {
+                WORLDBOOK_TYPE_CACHE.set(name, { type: 'unknown', name });
+                return { type: 'unknown', name };
+            }
+
+            let type = 'unknown';
+            if (detectTableWorldBook(meta.entries)) {
+                type = 'table';
+            } else if (detectSummaryWorldBook(name, meta.entries)) {
+                type = 'summary';
+            }
+
+            const result = { type, name };
+            WORLDBOOK_TYPE_CACHE.set(name, result);
+            return result;
+        } catch (e) {
+            Logger.warn(TAG, 'detectAndCacheWorldBookType failed', name, e);
+            return { type: 'unknown', name };
+        }
+    }
+
     async function renderWorldBookSelectors() {
         const mem = ensureMemoryConfig();
         const loading = document.getElementById('wbap-memory-loading');
         const tableListEl = document.getElementById('wbap-memory-table-list');
         const summaryListEl = document.getElementById('wbap-memory-summary-list');
         if (!tableListEl || !summaryListEl) return;
-        tableListEl.innerHTML = '';
-        summaryListEl.innerHTML = '';
+        tableListEl.innerHTML = '<div class="wbap-text-muted">加载中...</div>';
+        summaryListEl.innerHTML = '<div class="wbap-text-muted">加载中...</div>';
         if (loading) loading.style.display = 'inline-flex';
 
         try {
             const names = await WBAP.getAllWorldBookNames?.() || [];
-            const tableBooks = [];
-            const summaryBooks = [];
-            for (const name of names) {
-                const meta = await loadWorldBookMeta(name);
-                if (!meta) continue;
-                if (detectTableWorldBook(meta.entries)) tableBooks.push(name);
-                else if (detectSummaryWorldBook(name, meta.entries)) summaryBooks.push(name);
-            }
+
+            // 并发检测所有世界书类型
+            const typeResults = await Promise.all(
+                names.map(name => detectAndCacheWorldBookType(name))
+            );
+
+            // 分类
+            const tableBooks = typeResults.filter(r => r.type === 'table').map(r => r.name);
+            const summaryBooks = typeResults.filter(r => r.type === 'summary').map(r => r.name);
 
             const updateSelection = (type, selectedSet) => {
                 mem.selectedTableBooks = mem.selectedTableBooks.filter(n => tableBooks.includes(n));
@@ -755,6 +814,14 @@
                 renderSelectedTags();
                 renderTableApiConfig();
                 renderSummaryApiConfig();
+                updateWorldBookCounts();
+            };
+
+            const updateWorldBookCounts = () => {
+                const tableCount = document.getElementById('wbap-memory-table-count');
+                const summaryCount = document.getElementById('wbap-memory-summary-count');
+                if (tableCount) tableCount.textContent = mem.selectedTableBooks.length;
+                if (summaryCount) summaryCount.textContent = mem.selectedSummaryBooks.length;
             };
 
             const buildList = (items, selected, target, type) => {
@@ -775,6 +842,7 @@
             };
             buildList(tableBooks, new Set(mem.selectedTableBooks), tableListEl, 'table');
             buildList(summaryBooks, new Set(mem.selectedSummaryBooks), summaryListEl, 'summary');
+            updateWorldBookCounts();
         } catch (e) {
             tableListEl.innerHTML = '<div class="wbap-text-muted">加载失败</div>';
             summaryListEl.innerHTML = '<div class="wbap-text-muted">加载失败</div>';
@@ -1035,6 +1103,46 @@
         return (m ? m[1] : text).trim();
     }
 
+    // 智能去重合并结果
+    function mergeMemoryResults(pieces) {
+        const seen = new Set();
+        const uniqueLines = [];
+
+        for (const piece of pieces) {
+            const content = extractMemoryContent(piece);
+            if (!content) continue;
+
+            const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+            for (const line of lines) {
+                // 跳过完全相同的行
+                if (seen.has(line)) continue;
+
+                // 检查是否被已有内容包含（子串去重）
+                let isDuplicate = false;
+                for (const existing of seen) {
+                    // 如果新行被已有行包含，跳过
+                    if (existing.length > line.length && existing.includes(line)) {
+                        isDuplicate = true;
+                        break;
+                    }
+                    // 如果新行包含已有行，移除已有行
+                    if (line.length > existing.length && line.includes(existing)) {
+                        seen.delete(existing);
+                        const idx = uniqueLines.indexOf(existing);
+                        if (idx !== -1) uniqueLines.splice(idx, 1);
+                    }
+                }
+
+                if (!isDuplicate) {
+                    seen.add(line);
+                    uniqueLines.push(line);
+                }
+            }
+        }
+
+        return uniqueLines.join('\n');
+    }
+
     async function callMemoryEndpoint(block, endpoint, modelOverride = '') {
         if (!WBAP.callAI || !endpoint) return `${block.system}\n\n${block.user}`;
         try {
@@ -1066,34 +1174,49 @@
         }
 
         const preset = await ensureDefaultPreset(mem);
-        const pieces = [];
+        const tasks = [];
 
+        // 收集总结书任务
         for (const summaryName of mem.selectedSummaryBooks || []) {
             const ep = findEndpointById(mem.summaryEndpoints?.[summaryName]);
-            const content = await buildWorldbookContent([summaryName]);
-            const block = buildMemoryBlock({ userInput, context, worldbookContent: content, tableContent: '', preset });
-            block.model = mem.model;
-            pieces.push(await callMemoryEndpoint(block, ep, mem.model));
+            tasks.push((async () => {
+                const content = await buildWorldbookContent([summaryName]);
+                const block = buildMemoryBlock({ userInput, context, worldbookContent: content, tableContent: '', preset });
+                block.model = mem.model;
+                return callMemoryEndpoint(block, ep, mem.model);
+            })());
         }
 
+        // 收集表格书任务（需要先加载分类）
         for (const bookName of mem.selectedTableBooks || []) {
             const categories = await loadTableCategories(bookName);
             for (const cat of categories) {
                 const epId = mem.tableCategoryEndpoints?.[bookName]?.[cat];
                 const ep = findEndpointById(epId);
-                const tableContent = await loadCategoryContent(bookName, cat);
-                const block = buildMemoryBlock({ userInput, context, worldbookContent: '', tableContent, preset });
-                block.model = mem.model;
-                pieces.push(await callMemoryEndpoint(block, ep, mem.model));
+                tasks.push((async () => {
+                    const tableContent = await loadCategoryContent(bookName, cat);
+                    const block = buildMemoryBlock({ userInput, context, worldbookContent: '', tableContent, preset });
+                    block.model = mem.model;
+                    return callMemoryEndpoint(block, ep, mem.model);
+                })());
             }
         }
 
-        if (!pieces.length) {
+        if (!tasks.length) {
             const block = buildMemoryBlock({ userInput, context, worldbookContent: '', tableContent: '', preset });
             return `${block.system}\n\n${block.user}`;
         }
 
-        const body = pieces.map(extractMemoryContent).filter(Boolean).join('\n');
+        // 并发执行所有任务
+        const results = await Promise.all(tasks.map(t => t.catch(e => {
+            Logger.error(TAG, 'memory task failed', e);
+            return '';
+        })));
+
+        // 智能去重合并
+        const body = mergeMemoryResults(results);
+        if (!body) return '';
+
         return `<memory>\n${body}\n</memory>`;
     }
 

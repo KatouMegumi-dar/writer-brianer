@@ -216,6 +216,68 @@ html.wbap-overlay-open {
 }
 
 /* ============================================================================
+   [5.5] 可折叠组件样式
+   ============================================================================ */
+.wbap-collapsible {
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-sm);
+    background-color: var(--wbap-bg-element);
+    overflow: visible;
+}
+
+.wbap-collapsible-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 500;
+    color: var(--wbap-text);
+    background-color: var(--wbap-bg-element);
+    transition: background-color 0.2s ease;
+    border-radius: var(--wbap-border-radius-sm);
+}
+
+.wbap-collapsible[open] > .wbap-collapsible-header {
+    border-radius: var(--wbap-border-radius-sm) var(--wbap-border-radius-sm) 0 0;
+}
+
+.wbap-collapsible-header:hover {
+    background-color: var(--wbap-bg-element-hover);
+}
+
+.wbap-collapsible-header i {
+    color: var(--wbap-primary);
+    width: 16px;
+    text-align: center;
+}
+
+.wbap-collapsible-header::before {
+    content: '▶';
+    font-size: 10px;
+    color: var(--wbap-text-muted);
+    transition: transform 0.2s ease;
+}
+
+.wbap-collapsible[open] > .wbap-collapsible-header::before {
+    transform: rotate(90deg);
+}
+
+.wbap-collapsible > *:not(summary) {
+    padding: 0 12px 12px 12px;
+}
+
+.wbap-badge-sm {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    background-color: var(--wbap-primary);
+    color: var(--wbap-text-on-primary);
+    margin-left: auto;
+}
+
+/* ============================================================================
    [6] 按钮样式
    ============================================================================ */
 .wbap-btn {
@@ -325,6 +387,43 @@ html.wbap-overlay-open {
 }
 
 .wbap-form-group textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* 记忆模块编辑器表单样式 */
+#wbap-memory-prompt-editor input[type="text"],
+#wbap-memory-prompt-editor textarea,
+#wbap-memory-modal input[type="text"],
+#wbap-memory-modal textarea,
+.wbap-box input[type="text"],
+.wbap-box textarea {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: var(--wbap-font-sans);
+    background-color: var(--wbap-bg-input);
+    border: 1px solid var(--wbap-border-color);
+    border-radius: var(--wbap-border-radius-sm);
+    color: var(--wbap-text);
+    transition: border-color var(--wbap-transition-fast), box-shadow var(--wbap-transition-fast);
+    box-sizing: border-box;
+}
+
+#wbap-memory-prompt-editor input[type="text"]:focus,
+#wbap-memory-prompt-editor textarea:focus,
+#wbap-memory-modal input[type="text"]:focus,
+#wbap-memory-modal textarea:focus,
+.wbap-box input[type="text"]:focus,
+.wbap-box textarea:focus {
+    outline: none;
+    border-color: var(--wbap-primary);
+    box-shadow: 0 0 0 3px rgba(100, 100, 200, 0.2);
+}
+
+#wbap-memory-prompt-editor textarea,
+#wbap-memory-modal textarea,
+.wbap-box textarea {
     resize: vertical;
     min-height: 100px;
 }

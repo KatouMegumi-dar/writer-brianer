@@ -334,6 +334,11 @@
                     <span class="wbap-switch-slider"></span>
                     <span class="wbap-switch-text">显示处理进度面板</span>
                 </label>
+                <label class="wbap-switch-label">
+                    <input type="checkbox" id="wbap-settings-float-button">
+                    <span class="wbap-switch-slider"></span>
+                    <span class="wbap-switch-text">显示悬浮球（关闭后可通过扩展菜单打开）</span>
+                </label>
             </div>
 
             <div class="wbap-section" id="wbap-super-concurrency-section">
@@ -462,31 +467,31 @@
                         </div>
                         <div class="wbap-form-row">
                             <div class="wbap-form-group">
-                                <label>Max Tokens</label>
+                                <label>最大令牌数</label>
                                 <input type="number" id="wbap-optimization-max-tokens" min="0" value="4000">
                             </div>
                             <div class="wbap-form-group">
-                                <label>Temperature</label>
+                                <label>温度</label>
                                 <input type="number" id="wbap-optimization-temperature" min="0" max="2" step="0.1" value="0.7">
                             </div>
                         </div>
                         <div class="wbap-form-row">
                             <div class="wbap-form-group">
-                                <label>Timeout (s)</label>
+                                <label>超时时间 (秒)</label>
                                 <input type="number" id="wbap-optimization-timeout" min="0" value="60">
                             </div>
                             <div class="wbap-form-group">
-                                <label>Max Retries</label>
+                                <label>最大重试次数</label>
                                 <input type="number" id="wbap-optimization-max-retries" min="0" value="2">
                             </div>
                         </div>
                         <div class="wbap-form-row">
                             <div class="wbap-form-group">
-                                <label>Retry Delay (ms)</label>
+                                <label>重试延迟 (毫秒)</label>
                                 <input type="number" id="wbap-optimization-retry-delay" min="0" value="800">
                             </div>
                             <div class="wbap-form-group">
-                                <label>Streaming</label>
+                                <label>流式输出</label>
                                 <label style="display:flex; align-items:center; gap:6px; margin-top:6px;">
                                     <input type="checkbox" id="wbap-optimization-streaming" checked>
                                     启用
@@ -633,29 +638,29 @@
                 </div>
                 <div class="wbap-form-row">
                     <div class="wbap-form-group">
-                        <label>Max Tokens</label>
+                        <label>最大令牌数</label>
                         <input type="number" id="wbap-tiagang-max-tokens" min="0" value="2000">
                     </div>
                     <div class="wbap-form-group">
-                        <label>Temperature</label>
+                        <label>温度</label>
                         <input type="number" id="wbap-tiagang-temperature" min="0" max="2" step="0.1" value="0.7">
                     </div>
                     <div class="wbap-form-group">
-                        <label>Timeout (s)</label>
+                        <label>超时时间 (秒)</label>
                         <input type="number" id="wbap-tiagang-timeout" min="0" value="60">
                     </div>
                 </div>
                 <div class="wbap-form-row">
                     <div class="wbap-form-group">
-                        <label>Max Retries</label>
+                        <label>最大重试次数</label>
                         <input type="number" id="wbap-tiagang-max-retries" min="0" value="2">
                     </div>
                     <div class="wbap-form-group">
-                        <label>Retry Delay (ms)</label>
+                        <label>重试延迟 (毫秒)</label>
                         <input type="number" id="wbap-tiagang-retry-delay" min="0" value="800">
                     </div>
                     <div class="wbap-form-group">
-                        <label>Streaming</label>
+                        <label>流式输出</label>
                         <label style="display:flex; align-items:center; gap:6px; margin-top:6px;">
                             <input type="checkbox" id="wbap-tiagang-streaming" checked>
                             启用
@@ -737,11 +742,11 @@
                 </div>
                 <div class="wbap-form-row">
                     <div class="wbap-form-group">
-                        <label>Max Tokens</label>
+                        <label>最大令牌数</label>
                         <input type="number" id="wbap-endpoint-edit-max-tokens" value="2000">
                     </div>
                     <div class="wbap-form-group">
-                        <label>Temperature</label>
+                        <label>温度</label>
                         <div class="wbap-slider-row">
                             <input type="range" id="wbap-endpoint-edit-temperature" min="0" max="2" step="0.1" value="0.7">
                             <span id="wbap-endpoint-edit-temperature-value">0.7</span>
@@ -754,13 +759,13 @@
                         <input type="number" id="wbap-endpoint-edit-top-p" min="0" max="1" step="0.01" value="1">
                     </div>
                     <div class="wbap-form-group">
-                        <label>Presence Penalty</label>
+                        <label>存在惩罚</label>
                         <input type="number" id="wbap-endpoint-edit-presence-penalty" min="-2" max="2" step="0.1" value="0">
                     </div>
                 </div>
                 <div class="wbap-form-row">
                     <div class="wbap-form-group">
-                        <label>Frequency Penalty</label>
+                        <label>频率惩罚</label>
                         <input type="number" id="wbap-endpoint-edit-frequency-penalty" min="-2" max="2" step="0.1" value="0">
                     </div>
                     <div class="wbap-form-group">

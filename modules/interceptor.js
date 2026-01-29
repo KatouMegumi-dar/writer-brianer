@@ -114,28 +114,32 @@
         Logger.log('消息已拦截，开始处理...');
 
         try {
-            let workingInput = originalInput;
-
-            // 记忆模块优先：生成 Plot_progression 片段并附加
-            if (WBAP.MemoryModule && typeof WBAP.MemoryModule.processMessage === 'function') {
-                try {
-                    const memoryBlock = await WBAP.MemoryModule.processMessage(userInput);
-                    if (memoryBlock) {
-                        workingInput = `${originalInput}\n\n${memoryBlock}`;
-                    }
-                } catch (err) {
+            // 并行执行：记忆模块 + 自选模式（内含天纲）
+            const memoryPromise = (WBAP.MemoryModule && typeof WBAP.MemoryModule.processMessage === 'function')
+                ? WBAP.MemoryModule.processMessage(userInput).catch(err => {
                     Logger.warn('记忆模块处理失败，已跳过', err);
-                }
+                    return '';
+                })
+                : Promise.resolve('');
+
+            const analysisPromise = runSelectiveModeProcessing(originalInput.trim(), null, context).catch(err => {
+                Logger.warn('自选模式处理失败，已跳过', err);
+                return '';
+            });
+
+            // 等待所有任务完成
+            const [memoryBlock, analysisResult] = await Promise.all([memoryPromise, analysisPromise]);
+
+            // 合并结果
+            let finalOutput = originalInput;
+            if (memoryBlock) {
+                finalOutput = `${finalOutput}\n\n${memoryBlock}`;
             }
-
-            const analysisResult = await runSelectiveModeProcessing(workingInput.trim(), null, context);
-
             if (analysisResult) {
-                // 插入位置 A：用户输入在顶部，AI 结果在下方，以空行分隔
-                textarea.value = `${workingInput}\n\n${analysisResult}`;
-            } else {
-                textarea.value = workingInput; // 即使没有分析结果，也要确保用户输入的内容还在
+                finalOutput = `${finalOutput}\n\n${analysisResult}`;
             }
+
+            textarea.value = finalOutput;
 
             // 触发 input 事件以确保 SillyTavern UI 更新
             textarea.dispatchEvent(new Event('input', { bubbles: true }));
