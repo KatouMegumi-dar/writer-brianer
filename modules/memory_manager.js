@@ -411,11 +411,18 @@
       <label>API Key</label>
       <input type="text" id="wbap-memory-api-key" placeholder="可留空使用后端默认">
     </div>
-    <div class="wbap-form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <div>
-        <label>模型</label>
-        <input type="text" id="wbap-memory-api-model" placeholder="模型名称">
+    <div class="wbap-form-group">
+      <label>模型</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="wbap-memory-api-model" style="flex:1;min-width:200px;">
+          <option value="">请先获取模型列表</option>
+        </select>
+        <button id="wbap-memory-api-fetch-models" class="wbap-btn wbap-btn-xs wbap-btn-primary" title="获取模型列表">
+          <i class="fa-solid fa-download"></i> 获取模型
+        </button>
       </div>
+    </div>
+    <div class="wbap-form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
       <div>
         <label>最大tokens</label>
         <input type="number" id="wbap-memory-api-max" min="1" max="32000" placeholder="2000">
@@ -474,7 +481,19 @@
         document.getElementById('wbap-memory-api-name').value = ep?.name || '';
         document.getElementById('wbap-memory-api-url').value = ep?.apiUrl || '';
         document.getElementById('wbap-memory-api-key').value = ep?.apiKey || '';
-        document.getElementById('wbap-memory-api-model').value = ep?.model || '';
+        // 模型字段现在是 select，需要特殊处理
+        const modelSelect = document.getElementById('wbap-memory-api-model');
+        if (modelSelect) {
+            const currentModel = ep?.model || '';
+            // 如果当前模型不在选项中，添加一个选项
+            if (currentModel && !Array.from(modelSelect.options).some(opt => opt.value === currentModel)) {
+                const opt = document.createElement('option');
+                opt.value = currentModel;
+                opt.textContent = currentModel;
+                modelSelect.appendChild(opt);
+            }
+            modelSelect.value = currentModel;
+        }
         document.getElementById('wbap-memory-api-max').value = ep?.maxTokens ?? '';
         document.getElementById('wbap-memory-api-temp').value = ep?.temperature ?? '';
         document.getElementById('wbap-memory-api-top').value = ep?.topP ?? '';
@@ -538,6 +557,56 @@
             renderTableApiConfig();
             renderSummaryApiConfig();
             modal.classList.remove('open');
+        });
+
+        // 获取模型按钮事件
+        modal.querySelector('#wbap-memory-api-fetch-models')?.addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 获取中...';
+            btn.disabled = true;
+
+            try {
+                const apiUrl = document.getElementById('wbap-memory-api-url')?.value || '';
+                const apiKey = document.getElementById('wbap-memory-api-key')?.value || '';
+
+                if (!apiUrl) {
+                    throw new Error('请先填写 API URL');
+                }
+
+                const result = await WBAP.fetchEndpointModels({ apiUrl, apiKey });
+
+                if (result.success && result.models?.length) {
+                    const modelSelect = document.getElementById('wbap-memory-api-model');
+                    const currentModel = modelSelect?.value || '';
+
+                    // 清空并重新填充选项
+                    modelSelect.innerHTML = '';
+                    result.models.forEach(model => {
+                        const opt = document.createElement('option');
+                        opt.value = model;
+                        opt.textContent = model;
+                        if (model === currentModel) opt.selected = true;
+                        modelSelect.appendChild(opt);
+                    });
+
+                    // 如果之前的模型不在列表中，保留它
+                    if (currentModel && !result.models.includes(currentModel)) {
+                        const opt = document.createElement('option');
+                        opt.value = currentModel;
+                        opt.textContent = `${currentModel} (当前)`;
+                        opt.selected = true;
+                        modelSelect.insertBefore(opt, modelSelect.firstChild);
+                    }
+                } else {
+                    throw new Error(result.message || '获取模型列表失败');
+                }
+            } catch (err) {
+                alert(`获取模型失败: ${err.message}`);
+            } finally {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
         });
     }
 
