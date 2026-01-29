@@ -2533,6 +2533,7 @@ html.wbap-overlay-open {
     transform: translateY(20px) scale(0.95);
     transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
+    box-sizing: border-box;
 }
 
 .wbap-progress-panel.wbap-progress-dragging,
@@ -2574,6 +2575,11 @@ html.wbap-overlay-open {
 
 .wbap-progress-content {
     padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* 头部区域 - 增强布局 */
@@ -2587,6 +2593,9 @@ html.wbap-overlay-open {
     user-select: none;
     -webkit-user-select: none;
     touch-action: none;
+    width: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0;
 }
 
 .wbap-progress-title-row {
@@ -2699,17 +2708,22 @@ html.wbap-overlay-open {
 
 /* 主进度条 - 增强流动效果 */
 .wbap-progress-bar-container {
+    width: 100%;
     height: 10px;
     background: rgba(255, 255, 255, 0.08);
     border-radius: 12px;
     overflow: hidden;
     position: relative;
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    flex-shrink: 0;
 }
 
 .wbap-progress-main-bar {
     height: 12px;
     margin-bottom: 12px;
+    width: 100%;
+}
 }
 
 .wbap-progress-bar {
@@ -2819,6 +2833,9 @@ html.wbap-overlay-open {
     color: var(--wbap-text-secondary);
     margin-bottom: 16px;
     padding: 0 2px;
+    width: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0;
 }
 
 #wbap-progress-status {
@@ -2848,6 +2865,8 @@ html.wbap-overlay-open {
     gap: 8px;
     padding-right: 4px;
     scroll-behavior: smooth;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .wbap-progress-tasks::-webkit-scrollbar {
@@ -2876,6 +2895,9 @@ html.wbap-overlay-open {
     padding: 10px 12px;
     transition: all 0.3s ease;
     animation: taskSlideIn 0.3s ease-out;
+    width: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0;
 }
 
 .wbap-progress-task-card:hover {
@@ -2982,11 +3004,13 @@ html.wbap-overlay-open {
 }
 
 .wbap-task-bar-container {
+    width: 100%;
     height: 5px;
     background: rgba(255, 255, 255, 0.08);
     border-radius: 5px;
     overflow: hidden;
     margin-bottom: 6px;
+    box-sizing: border-box;
 }
 
 .wbap-task-bar {
