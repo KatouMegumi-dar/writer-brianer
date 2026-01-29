@@ -452,6 +452,9 @@
         loadWorldBookEntriesByName,
         abortMessage
     }) {
+        // 检测进度面板是否已打开（可能由 interceptor 打开）
+        const cabinetPanelAlreadyOpen = WBAP.UI?.isProgressPanelOpen?.();
+
         if (!config || !config.selectiveMode) {
             Logger.warn('Cabinet skipped: config not initialized.');
             return null;
@@ -595,7 +598,8 @@
 
         if (abortAllRequested) {
             Logger.warn('Cabinet aborted before merge.');
-            if (config?.showProgressPanel && WBAP.UI) {
+            // 注意：不在这里隐藏进度面板，由 interceptor 统一管理
+            if (config?.showProgressPanel && WBAP.UI && !cabinetPanelAlreadyOpen) {
                 WBAP.UI.hideProgressPanel();
             }
             return null;
@@ -619,7 +623,8 @@
 
         if (abortAllRequested) {
             Logger.warn('Cabinet aborted before merge.');
-            if (config?.showProgressPanel && WBAP.UI) {
+            // 注意：不在这里隐藏进度面板，由 interceptor 统一管理
+            if (config?.showProgressPanel && WBAP.UI && !cabinetPanelAlreadyOpen) {
                 WBAP.UI.hideProgressPanel();
             }
             return null;
@@ -674,7 +679,8 @@
             cabinetUI.addMessage?.({ role: 'chancellor', label: chancellorLabel, content: finalResult });
         }
 
-        if (config?.showProgressPanel && WBAP.UI) {
+        // 注意：不在这里隐藏进度面板，由 interceptor 统一管理
+        if (config?.showProgressPanel && WBAP.UI && !cabinetPanelAlreadyOpen) {
             WBAP.UI.hideProgressPanel();
         }
 
@@ -693,6 +699,9 @@
         let abortAllRequested = false;
 
         if (globalSettings.enableSuperConcurrency === true) {
+            // 检测进度面板是否已打开（可能由 interceptor 打开）
+            const superPanelAlreadyOpen = WBAP.UI?.isProgressPanelOpen?.();
+
             const cabinetResult = await runCabinetDiscussion({
                 userInput,
                 bookName,
@@ -716,8 +725,11 @@
             const showProgress = config?.showProgressPanel && WBAP.UI;
             const extraTasks = (tgEnabled ? 1 : 0) + (doLevel3 ? 1 : 0);
             if (showProgress && extraTasks > 0) {
-                const panelEl = document.getElementById('wbap-progress-panel');
-                if (panelEl && !panelEl.classList.contains('open')) {
+                if (superPanelAlreadyOpen) {
+                    // 面板已打开，只增加任务数
+                    WBAP.UI.addToTotalTaskCount?.(extraTasks);
+                } else {
+                    // 面板未打开，初始化面板
                     WBAP.UI.showProgressPanel('\u6b63\u5728\u5904\u7406...', extraTasks);
                 }
                 if (tgEnabled) {
@@ -793,11 +805,15 @@
             } else if (tgText) {
                 Logger.warn('Tiangang result equals user input; ignored');
             }
-            if (config?.showProgressPanel && WBAP.UI) {
+            // 注意：不在这里隐藏进度面板，由 interceptor 统一管理
+            if (config?.showProgressPanel && WBAP.UI && !superPanelAlreadyOpen) {
                 WBAP.UI.hideProgressPanel();
             }
             return output;
         }
+
+        // 检测进度面板是否已打开（可能由 interceptor 或 memory_manager 打开）
+        const panelAlreadyOpen = WBAP.UI?.isProgressPanelOpen?.();
 
         try {
             // 进度面板初始化时传递任务总数（稍后确定）
@@ -1115,7 +1131,13 @@
             // 初始化进度面板（传递任务总数）
             if (showProgress && !progressInitialized) {
                 const totalTasks = taskConfigs.length + (tgEnabled ? 1 : 0);
-                WBAP.UI.showProgressPanel('正在处理任务...', totalTasks);
+                if (panelAlreadyOpen) {
+                    // 面板已打开，只增加任务数
+                    WBAP.UI.addToTotalTaskCount?.(totalTasks);
+                } else {
+                    // 面板未打开，初始化面板
+                    WBAP.UI.showProgressPanel('正在处理任务...', totalTasks);
+                }
                 progressInitialized = true;
                 // 为每个任务创建进度条目
                 taskConfigs.forEach(task => {
@@ -1431,7 +1453,9 @@
             Logger.error('Selective mode processing failed', e);
             throw e;
         } finally {
-            if (config?.showProgressPanel && WBAP.UI) {
+            // 注意：不在这里隐藏进度面板，由 interceptor 统一管理
+            // 如果是独立调用（面板由本模块打开），则隐藏
+            if (config?.showProgressPanel && WBAP.UI && !panelAlreadyOpen) {
                 WBAP.UI.hideProgressPanel();
             }
         }

@@ -2746,6 +2746,24 @@
         }
     }
 
+    function isProgressPanelOpen() {
+        const panel = document.getElementById('wbap-progress-panel');
+        return panel && panel.classList.contains('open');
+    }
+
+    function addToTotalTaskCount(count) {
+        if (count <= 0) return;
+        totalTaskCount += count;
+        const taskCountEl = document.getElementById('wbap-progress-task-count');
+        if (taskCountEl) {
+            let completedCount = 0;
+            progressTasks.forEach(task => {
+                if (task.completed) completedCount++;
+            });
+            taskCountEl.textContent = `${completedCount}/${totalTaskCount}`;
+        }
+    }
+
     function showProgressPanel(message = '正在处理...', taskCount = 0) {
         const panel = document.getElementById('wbap-progress-panel');
         if (!panel) return;
@@ -3224,6 +3242,8 @@
         refreshOptimizationPromptList,
         refreshSecondaryPromptUI,
         refreshTiagangPromptList,
+        isProgressPanelOpen,
+        addToTotalTaskCount,
         showProgressPanel,
         updateProgressPanel,
         hideProgressPanel,

@@ -113,6 +113,13 @@
         if (sendButton) sendButton.disabled = true;
         Logger.log('消息已拦截，开始处理...');
 
+        // 统一初始化进度面板（由 interceptor 管理）
+        const showProgress = config?.showProgressPanel && WBAP.UI;
+        if (showProgress) {
+            // 先显示面板，具体任务数由各模块添加
+            WBAP.UI.showProgressPanel('正在处理...', 0);
+        }
+
         try {
             // 并行执行：记忆模块 + 自选模式（内含天纲）
             const memoryPromise = (WBAP.MemoryModule && typeof WBAP.MemoryModule.processMessage === 'function')
@@ -156,6 +163,10 @@
         } finally {
             isProcessing = false;
             if (sendButton) sendButton.disabled = false;
+            // 统一关闭进度面板
+            if (showProgress) {
+                WBAP.UI.hideProgressPanel();
+            }
             // 确保 skipNextHook 在短时间后被重置，以防万一
             setTimeout(() => { skipNextHook = false; }, 100);
         }

@@ -1475,8 +1475,16 @@
         // 计算总任务数（快照任务 + 总结书任务 + 表格书任务）
         const totalTasks = 1 + summaryTasks.length + tableTasks.length;
 
+        // 检测进度面板是否已打开（由 interceptor 统一初始化）
+        const panelAlreadyOpen = WBAP.UI?.isProgressPanelOpen?.();
         if (showProgress) {
-            WBAP.UI.showProgressPanel('记忆模块处理中...', totalTasks);
+            if (panelAlreadyOpen) {
+                // 面板已打开，只增加任务数
+                WBAP.UI.addToTotalTaskCount?.(totalTasks);
+            } else {
+                // 面板未打开，初始化面板
+                WBAP.UI.showProgressPanel('记忆模块处理中...', totalTasks);
+            }
             // 添加快照任务
             WBAP.UI.addProgressTask('memory-snapshot', '快照: 高维快照/短期记忆', '等待中...');
             // 添加总结书任务
@@ -1582,8 +1590,9 @@
             Promise.all(tablePromises)
         ]);
 
-        // 隐藏进度条
-        if (showProgress) {
+        // 注意：不在这里隐藏进度面板，由 interceptor 统一管理
+        // 如果是独立调用（面板由本模块打开），则隐藏
+        if (showProgress && !panelAlreadyOpen) {
             WBAP.UI.hideProgressPanel();
         }
 
