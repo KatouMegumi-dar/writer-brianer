@@ -3063,7 +3063,7 @@
         dragHandle.addEventListener('pointercancel', onPointerUp);
     }
 
-    function makeElementResizable(element, handle) {
+    function makeElementResizable(element, handle, direction = 'se') {
         if (!handle) return;
         const margin = 8;
         const minWidth = 280;
@@ -3084,6 +3084,8 @@
             if (!pending) return;
             element.style.width = `${pending.width}px`;
             element.style.height = `${pending.height}px`;
+            if (pending.left !== undefined) element.style.left = `${pending.left}px`;
+            if (pending.top !== undefined) element.style.top = `${pending.top}px`;
             element.style.maxWidth = 'none';
             element.style.maxHeight = 'none';
             pending = null;
@@ -3119,12 +3121,45 @@
             if (pointerId === null || e.pointerId !== pointerId) return;
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
-            const maxWidth = Math.max(minWidth, window.innerWidth - startLeft - margin);
-            const maxHeight = Math.max(minHeight, window.innerHeight - startTop - margin);
-            const nextWidth = Math.min(maxWidth, Math.max(minWidth, startWidth + dx));
-            const nextHeight = Math.min(maxHeight, Math.max(minHeight, startHeight + dy));
 
-            pending = { width: nextWidth, height: nextHeight };
+            let nextWidth, nextHeight, nextLeft, nextTop;
+
+            // 根据方向计算新的尺寸和位置
+            if (direction === 'se') {
+                // 右下角：增加宽高
+                const maxWidth = Math.max(minWidth, window.innerWidth - startLeft - margin);
+                const maxHeight = Math.max(minHeight, window.innerHeight - startTop - margin);
+                nextWidth = Math.min(maxWidth, Math.max(minWidth, startWidth + dx));
+                nextHeight = Math.min(maxHeight, Math.max(minHeight, startHeight + dy));
+                nextLeft = startLeft;
+                nextTop = startTop;
+            } else if (direction === 'sw') {
+                // 左下角：左边界移动，宽度反向变化
+                const maxWidth = Math.max(minWidth, startLeft + startWidth - margin);
+                const maxHeight = Math.max(minHeight, window.innerHeight - startTop - margin);
+                nextWidth = Math.min(maxWidth, Math.max(minWidth, startWidth - dx));
+                nextHeight = Math.min(maxHeight, Math.max(minHeight, startHeight + dy));
+                nextLeft = startLeft + startWidth - nextWidth;
+                nextTop = startTop;
+            } else if (direction === 'ne') {
+                // 右上角：上边界移动，高度反向变化
+                const maxWidth = Math.max(minWidth, window.innerWidth - startLeft - margin);
+                const maxHeight = Math.max(minHeight, startTop + startHeight - margin);
+                nextWidth = Math.min(maxWidth, Math.max(minWidth, startWidth + dx));
+                nextHeight = Math.min(maxHeight, Math.max(minHeight, startHeight - dy));
+                nextLeft = startLeft;
+                nextTop = startTop + startHeight - nextHeight;
+            } else if (direction === 'nw') {
+                // 左上角：左边界和上边界都移动
+                const maxWidth = Math.max(minWidth, startLeft + startWidth - margin);
+                const maxHeight = Math.max(minHeight, startTop + startHeight - margin);
+                nextWidth = Math.min(maxWidth, Math.max(minWidth, startWidth - dx));
+                nextHeight = Math.min(maxHeight, Math.max(minHeight, startHeight - dy));
+                nextLeft = startLeft + startWidth - nextWidth;
+                nextTop = startTop + startHeight - nextHeight;
+            }
+
+            pending = { width: nextWidth, height: nextHeight, left: nextLeft, top: nextTop };
             if (!rafId) {
                 rafId = requestAnimationFrame(applySize);
             }
@@ -3157,11 +3192,12 @@
             const dragHandle = panel.querySelector('.wbap-progress-header');
             makeElementDraggable(panel, dragHandle || panel);
 
-            // Make resizable
-            const handle = document.getElementById('wbap-progress-resize-handle');
-            if (handle) {
-                makeElementResizable(panel, handle);
-            }
+            // Make resizable from all four corners
+            const resizeHandles = panel.querySelectorAll('.wbap-resize-handle');
+            resizeHandles.forEach(handle => {
+                const direction = handle.dataset.direction || 'se';
+                makeElementResizable(panel, handle, direction);
+            });
 
             // Close button
             const closeBtn = document.getElementById('wbap-progress-close');

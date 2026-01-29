@@ -3092,17 +3092,38 @@ html.wbap-overlay-open {
     color: #22c55e;
 }
 
-/* 拖拽手柄 */
+/* 拖拽手柄 - 四角缩放 */
 .wbap-progress-panel .wbap-resize-handle {
     position: absolute;
-    bottom: 0;
-    right: 0;
     width: 20px;
     height: 20px;
-    cursor: nwse-resize;
     opacity: 0.3;
     transition: opacity 0.2s ease;
     touch-action: none;
+}
+
+.wbap-progress-panel .wbap-resize-handle.wbap-resize-se {
+    bottom: 0;
+    right: 0;
+    cursor: nwse-resize;
+}
+
+.wbap-progress-panel .wbap-resize-handle.wbap-resize-sw {
+    bottom: 0;
+    left: 0;
+    cursor: nesw-resize;
+}
+
+.wbap-progress-panel .wbap-resize-handle.wbap-resize-ne {
+    top: 0;
+    right: 0;
+    cursor: nesw-resize;
+}
+
+.wbap-progress-panel .wbap-resize-handle.wbap-resize-nw {
+    top: 0;
+    left: 0;
+    cursor: nwse-resize;
 }
 
 .wbap-progress-panel.wbap-progress-dragging .wbap-progress-header {
@@ -3113,15 +3134,40 @@ html.wbap-overlay-open {
     opacity: 0.7;
 }
 
+/* 四角缩放手柄图标 */
 .wbap-progress-panel .wbap-resize-handle::after {
     content: '';
     position: absolute;
-    bottom: 4px;
-    right: 4px;
     width: 8px;
     height: 8px;
+}
+
+.wbap-progress-panel .wbap-resize-handle.wbap-resize-se::after {
+    bottom: 4px;
+    right: 4px;
     border-right: 2px solid var(--wbap-text-muted);
     border-bottom: 2px solid var(--wbap-text-muted);
+}
+
+.wbap-progress-panel .wbap-resize-handle.wbap-resize-sw::after {
+    bottom: 4px;
+    left: 4px;
+    border-left: 2px solid var(--wbap-text-muted);
+    border-bottom: 2px solid var(--wbap-text-muted);
+}
+
+.wbap-progress-panel .wbap-resize-handle.wbap-resize-ne::after {
+    top: 4px;
+    right: 4px;
+    border-right: 2px solid var(--wbap-text-muted);
+    border-top: 2px solid var(--wbap-text-muted);
+}
+
+.wbap-progress-panel .wbap-resize-handle.wbap-resize-nw::after {
+    top: 4px;
+    left: 4px;
+    border-left: 2px solid var(--wbap-text-muted);
+    border-top: 2px solid var(--wbap-text-muted);
 }
 
 /* 移动端适配 */

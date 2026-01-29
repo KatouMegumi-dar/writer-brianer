@@ -885,13 +885,16 @@
             <span id="wbap-progress-status">准备中...</span>
             <span id="wbap-progress-percent">0%</span>
         </div>
-        
+
         <!-- 任务实例列表区域 -->
         <div id="wbap-progress-tasks" class="wbap-progress-tasks">
             <!-- 动态添加的任务卡片 -->
         </div>
     </div>
-    <div class="wbap-resize-handle" id="wbap-progress-resize-handle"></div>
+    <div class="wbap-resize-handle wbap-resize-nw" data-direction="nw"></div>
+    <div class="wbap-resize-handle wbap-resize-ne" data-direction="ne"></div>
+    <div class="wbap-resize-handle wbap-resize-sw" data-direction="sw"></div>
+    <div class="wbap-resize-handle wbap-resize-se" data-direction="se" id="wbap-progress-resize-handle"></div>
 </div>
 `;
 
