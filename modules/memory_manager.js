@@ -448,30 +448,6 @@
         <input type="number" id="wbap-memory-api-timeout" min="1" max="300" placeholder="60">
       </div>
     </div>
-    <div class="wbap-form-group" style="border-top:1px solid var(--SmartThemeBorderColor, #444);padding-top:10px;margin-top:5px;">
-      <label style="font-weight:bold;">提示词变量 (sulv1-4)</label>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
-        <div>
-          <label>sulv1</label>
-          <input type="text" id="wbap-memory-api-sulv1" placeholder="例如: 0.6">
-        </div>
-        <div>
-          <label>sulv2</label>
-          <input type="text" id="wbap-memory-api-sulv2" placeholder="例如: 8">
-        </div>
-        <div>
-          <label>sulv3</label>
-          <input type="text" id="wbap-memory-api-sulv3" placeholder="例如: 6">
-        </div>
-        <div>
-          <label>sulv4</label>
-          <input type="text" id="wbap-memory-api-sulv4" placeholder="自定义变量">
-        </div>
-      </div>
-      <div style="font-size:0.85em;color:var(--SmartThemeQuoteColor, #888);margin-top:4px;">
-        这些变量会替换提示词中的 {sulv1}、{sulv2}、{sulv3}、{sulv4} 占位符
-      </div>
-    </div>
   </div>
   <div class="wbap-modal-footer" style="display:flex;gap:8px;justify-content:flex-end;">
     <button id="wbap-memory-api-save" class="wbap-btn wbap-btn-primary">保存</button>
@@ -524,15 +500,6 @@
         document.getElementById('wbap-memory-api-presence').value = ep?.presencePenalty ?? '';
         document.getElementById('wbap-memory-api-frequency').value = ep?.frequencyPenalty ?? '';
         document.getElementById('wbap-memory-api-timeout').value = ep?.timeout ?? '';
-
-        // 加载当前预设的 sulv 变量
-        const mem = ensureMemoryConfig();
-        const preset = getSelectedPreset(mem);
-        const vars = preset?.variables || {};
-        document.getElementById('wbap-memory-api-sulv1').value = vars.sulv1 ?? '';
-        document.getElementById('wbap-memory-api-sulv2').value = vars.sulv2 ?? '';
-        document.getElementById('wbap-memory-api-sulv3').value = vars.sulv3 ?? '';
-        document.getElementById('wbap-memory-api-sulv4').value = vars.sulv4 ?? '';
     }
 
     function collectApiFromForm(ep) {
@@ -546,18 +513,6 @@
         ep.presencePenalty = parseFloat(document.getElementById('wbap-memory-api-presence').value) || 0;
         ep.frequencyPenalty = parseFloat(document.getElementById('wbap-memory-api-frequency').value) || 0;
         ep.timeout = parseInt(document.getElementById('wbap-memory-api-timeout').value, 10) || ep.timeout || 60;
-
-        // 保存 sulv 变量到当前预设
-        const mem = ensureMemoryConfig();
-        const preset = getSelectedPreset(mem);
-        if (preset) {
-            preset.variables = preset.variables || {};
-            preset.variables.sulv1 = document.getElementById('wbap-memory-api-sulv1').value || '';
-            preset.variables.sulv2 = document.getElementById('wbap-memory-api-sulv2').value || '';
-            preset.variables.sulv3 = document.getElementById('wbap-memory-api-sulv3').value || '';
-            preset.variables.sulv4 = document.getElementById('wbap-memory-api-sulv4').value || '';
-        }
-
         return ep;
     }
 
