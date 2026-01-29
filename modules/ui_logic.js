@@ -1077,6 +1077,29 @@
         return config.superConcurrency;
     }
 
+    // 获取/初始化全局天纲配置（仅用于 API/启用开关，全局共享）
+    function getGlobalTiangangConfig() {
+        const pools = WBAP.getGlobalPools ? WBAP.getGlobalPools() : (WBAP.mainConfig?.globalPools || {});
+        if (!pools.tiangang) pools.tiangang = {};
+        if (!pools.tiangang.apiConfig) {
+            pools.tiangang.apiConfig = WBAP.createDefaultTiangangApiProfile
+                ? WBAP.createDefaultTiangangApiProfile()
+                : {
+                    apiUrl: '',
+                    apiKey: '',
+                    model: '',
+                    maxTokens: 2000,
+                    temperature: 0.7,
+                    timeout: 60,
+                    maxRetries: 1,
+                    retryDelayMs: 800,
+                    enableStreaming: true
+                };
+        }
+        if (pools.tiangang.enabled === undefined) pools.tiangang.enabled = false;
+        return pools.tiangang;
+    }
+
     function ensureTiagangConfig(config) {
         if (!config.tiangang) {
             const fallbackPreset = WBAP.createDefaultTiangangPromptPreset
@@ -1090,20 +1113,12 @@
                     variables: { sulv1: '', sulv2: '', sulv3: '', sulv4: '' }
                 };
             config.tiangang = {
+                // 启用状态、API 配置改为全局管理，此处仅保留兼容字段
                 enabled: false,
                 prompts: [fallbackPreset],
                 selectedPromptIndex: 0,
                 contextRounds: config.contextRounds ?? 5,
-                apiConfig: {
-                    apiUrl: '',
-                    apiKey: '',
-                    model: '',
-                    maxTokens: 2000,
-                    temperature: 0.7,
-                    timeout: 60,
-                    maxRetries: 1,
-                    retryDelayMs: 800
-                },
+                apiConfig: {}, // 兼容旧数据，占位但不再使用
                 worldBooks: [],
                 assignedEntriesMap: {}
             };
@@ -1114,18 +1129,8 @@
             tgCfg.selectedPromptIndex = 0;
         }
         if (tgCfg.selectedPromptIndex == null) tgCfg.selectedPromptIndex = 0;
-        if (!tgCfg.apiConfig) {
-            tgCfg.apiConfig = {
-                apiUrl: '',
-                apiKey: '',
-                model: '',
-                maxTokens: 2000,
-                temperature: 0.7,
-                timeout: 60,
-                maxRetries: 1,
-                retryDelayMs: 800
-            };
-        }
+        // apiConfig 不再在角色级别存储，保留旧字段避免报错
+        if (!tgCfg.apiConfig) tgCfg.apiConfig = {};
         if (!Array.isArray(tgCfg.worldBooks)) tgCfg.worldBooks = [];
         if (!tgCfg.assignedEntriesMap) tgCfg.assignedEntriesMap = {};
         if (tgCfg.contextRounds == null) tgCfg.contextRounds = config.contextRounds ?? 5;
@@ -1561,9 +1566,14 @@
         const config = WBAP.CharacterManager ? WBAP.CharacterManager.getCurrentCharacterConfig() : WBAP.config;
         if (!config) return;
         const tgCfg = ensureTiagangConfig(config);
+        const globalTg = getGlobalTiangangConfig();
 
         const enabledEl = document.getElementById('wbap-tiagang-enabled');
-        if (enabledEl) enabledEl.checked = tgCfg.enabled === true;
+        if (enabledEl) {
+            enabledEl.checked = globalTg.enabled === true;
+            // 同步旧字段，避免其它代码读取角色级 enabled 出现不一致
+            tgCfg.enabled = globalTg.enabled === true;
+        }
 
         const roundsEl = document.getElementById('wbap-tiagang-context-rounds');
         const roundsValEl = document.getElementById('wbap-tiagang-context-rounds-value');
@@ -1573,7 +1583,7 @@
             roundsValEl.textContent = safeRounds;
         }
 
-        const apiCfg = tgCfg.apiConfig || {};
+        const apiCfg = globalTg.apiConfig || {};
         const apiUrlEl = document.getElementById('wbap-tiagang-api-url');
         const apiKeyEl = document.getElementById('wbap-tiagang-api-key');
         const maxTokensEl = document.getElementById('wbap-tiagang-max-tokens');
@@ -1601,14 +1611,20 @@
         const config = WBAP.CharacterManager ? WBAP.CharacterManager.getCurrentCharacterConfig() : WBAP.config;
         if (!config) return;
         const tgCfg = ensureTiagangConfig(config);
+        const globalTg = getGlobalTiangangConfig();
 
         const enabledEl = document.getElementById('wbap-tiagang-enabled');
-        if (enabledEl) tgCfg.enabled = enabledEl.checked === true;
+        if (enabledEl) {
+            const enabled = enabledEl.checked === true;
+            globalTg.enabled = enabled;
+            // 兼容旧字段
+            tgCfg.enabled = enabled;
+        }
 
         const roundsVal = parseInt(document.getElementById('wbap-tiagang-context-rounds')?.value, 10);
         tgCfg.contextRounds = Number.isFinite(roundsVal) ? roundsVal : (tgCfg.contextRounds ?? 5);
 
-        const apiCfg = tgCfg.apiConfig || {};
+        const apiCfg = globalTg.apiConfig || {};
         apiCfg.apiUrl = document.getElementById('wbap-tiagang-api-url')?.value || '';
         apiCfg.apiKey = document.getElementById('wbap-tiagang-api-key')?.value || '';
         apiCfg.model = document.getElementById('wbap-tiagang-model')?.value || '';
@@ -1623,7 +1639,7 @@
         const retryDelayVal = parseInt(document.getElementById('wbap-tiagang-retry-delay')?.value, 10);
         apiCfg.retryDelayMs = Number.isFinite(retryDelayVal) && retryDelayVal > 0 ? retryDelayVal : 800;
         apiCfg.enableStreaming = document.getElementById('wbap-tiagang-streaming')?.checked !== false;
-        tgCfg.apiConfig = apiCfg;
+        globalTg.apiConfig = apiCfg;
 
         if (apiCfg.apiUrl && WBAP.setupPreconnect) {
             WBAP.setupPreconnect([{ apiUrl: apiCfg.apiUrl }]);
@@ -1963,7 +1979,7 @@
         descriptionArea.textContent = prompts[selectedIndex].description || '此预设没有描述。';
         if (bindingSummary) {
             const boundIds = Array.isArray(prompts[selectedIndex].boundEndpointIds) ? prompts[selectedIndex].boundEndpointIds.filter(Boolean) : [];
-            const endpoints = currentConfig?.selectiveMode?.apiEndpoints || [];
+            const endpoints = getGlobalSelectiveEndpoints();
             const nameMap = new Map(endpoints.map(ep => [ep.id, ep.name || ep.id]));
             if (boundIds.length === 0) {
                 bindingSummary.textContent = '未绑定 API（将使用所有已配置实例）。';
@@ -2088,7 +2104,7 @@
     function updatePromptBindingTags(selectedIds = [], endpoints = null) {
         const tagsEl = document.getElementById('wbap-prompt-bound-apis');
         if (!tagsEl) return;
-        const eps = endpoints || (WBAP.CharacterManager.getCurrentCharacterConfig()?.selectiveMode?.apiEndpoints || []);
+        const eps = endpoints || getGlobalSelectiveEndpoints();
         if (!selectedIds || selectedIds.length === 0) {
             tagsEl.innerHTML = '<small class="wbap-text-muted">未绑定（默认使用全部）</small>';
             return;
@@ -2103,8 +2119,7 @@
     function updateSecondaryBindingSummary(selectedIds = []) {
         const summaryEl = document.getElementById('wbap-secondary-binding-summary');
         if (!summaryEl) return;
-        const currentConfig = WBAP.CharacterManager.getCurrentCharacterConfig();
-        const endpoints = currentConfig?.selectiveMode?.apiEndpoints || [];
+        const endpoints = getGlobalSelectiveEndpoints();
         const map = new Map(endpoints.map(ep => [ep.id, ep.name || ep.id]));
         if (!selectedIds || selectedIds.length === 0) {
             summaryEl.textContent = '未绑定 API（将使用所有已配置实例）。';
@@ -2117,8 +2132,7 @@
     function renderSecondaryBindingList(selectedIds = []) {
         const listEl = document.getElementById('wbap-secondary-binding-list');
         if (!listEl) return;
-        const currentConfig = WBAP.CharacterManager.getCurrentCharacterConfig();
-        const endpoints = currentConfig?.selectiveMode?.apiEndpoints || [];
+        const endpoints = getGlobalSelectiveEndpoints();
         const selected = new Set(selectedIds);
         if (endpoints.length === 0) {
             listEl.innerHTML = '<small class="wbap-text-muted">暂无已配置的 API 实例。</small>';
@@ -2137,8 +2151,7 @@
     function renderPromptBindingList(selectedIds = []) {
         const listEl = document.getElementById('wbap-prompt-binding-list');
         if (!listEl) return;
-        const currentConfig = WBAP.CharacterManager.getCurrentCharacterConfig();
-        const endpoints = currentConfig?.selectiveMode?.apiEndpoints || [];
+        const endpoints = getGlobalSelectiveEndpoints();
         const selected = new Set(selectedIds);
         if (endpoints.length === 0) {
             listEl.innerHTML = '<small class="wbap-text-muted">暂无已配置的 API 实例。</small>';
@@ -2159,8 +2172,7 @@
     function updatePromptBindingSummary(selectedIds = []) {
         const bindingSummary = document.getElementById('wbap-prompt-binding-summary');
         if (!bindingSummary) return;
-        const currentConfig = WBAP.CharacterManager ? WBAP.CharacterManager.getCurrentCharacterConfig() : WBAP.config;
-        const endpoints = currentConfig?.selectiveMode?.apiEndpoints || [];
+        const endpoints = getGlobalSelectiveEndpoints();
         const nameMap = new Map(endpoints.map(ep => [ep.id, ep.name || ep.id]));
         if (selectedIds.length === 0) {
             bindingSummary.textContent = '未绑定 API（将使用所有已配置实例）。';

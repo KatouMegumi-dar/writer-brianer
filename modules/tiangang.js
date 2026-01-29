@@ -49,6 +49,11 @@
         return pools.tiangang.apiConfig;
     }
 
+    function getGlobalTiangangEnabled() {
+        const pools = getGlobalPools();
+        return pools?.tiangang?.enabled === true;
+    }
+
     function ensureTiangangConfig(config) {
         if (!config?.tiangang) return null;
         const tgCfg = config.tiangang;
@@ -200,7 +205,8 @@
     async function process(inputText, options = {}) {
         const config = options.config || getConfig();
         const tgCfg = ensureTiangangConfig(config);
-        if (!tgCfg || tgCfg.enabled !== true) return null;
+        const enabled = getGlobalTiangangEnabled() || (tgCfg?.enabled === true);
+        if (!tgCfg || !enabled) return null;
 
         const promptTemplate = getSelectedPrompt(tgCfg);
         if (!promptTemplate) {
