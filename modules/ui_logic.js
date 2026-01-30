@@ -1168,20 +1168,9 @@
 
     function ensureTiagangConfig(config) {
         if (!config.tiangang) {
-            const fallbackPreset = WBAP.createDefaultTiangangPromptPreset
-                ? WBAP.createDefaultTiangangPromptPreset()
-                : {
-                    name: 'Tiangang Prompt',
-                    description: 'Plot guidance prompt',
-                    systemPrompt: '',
-                    mainPrompt: '',
-                    finalSystemDirective: '',
-                    variables: { sulv1: '', sulv2: '', sulv3: '', sulv4: '' }
-                };
             config.tiangang = {
-                // 启用状态、API 配置改为全局管理，此处仅保留兼容字段
+                // 启用状态、API 配置、提示词改为全局管理，此处仅保留兼容字段
                 enabled: false,
-                prompts: [fallbackPreset],
                 selectedPromptIndex: 0,
                 contextRounds: config.contextRounds ?? 5,
                 apiConfig: {}, // 兼容旧数据，占位但不再使用
@@ -1190,10 +1179,7 @@
             };
         }
         const tgCfg = config.tiangang;
-        if (!Array.isArray(tgCfg.prompts) || tgCfg.prompts.length === 0) {
-            tgCfg.prompts = [WBAP.createDefaultTiangangPromptPreset ? WBAP.createDefaultTiangangPromptPreset() : {}];
-            tgCfg.selectedPromptIndex = 0;
-        }
+        // 不再在角色级别维护 prompts 数组，全部从全局池读取
         if (tgCfg.selectedPromptIndex == null) tgCfg.selectedPromptIndex = 0;
         // apiConfig 不再在角色级别存储，保留旧字段避免报错
         if (!tgCfg.apiConfig) tgCfg.apiConfig = {};
@@ -1281,7 +1267,11 @@
         const config = WBAP.CharacterManager ? WBAP.CharacterManager.getCurrentCharacterConfig() : WBAP.config;
         if (!config) return;
         const tgCfg = ensureTiagangConfig(config);
-        const prompts = Array.isArray(tgCfg.prompts) ? tgCfg.prompts : [];
+
+        // 修复：从全局池读取提示词
+        const pools = WBAP.getGlobalPools();
+        const prompts = Array.isArray(pools.prompts?.tiangang) ? pools.prompts.tiangang : [];
+
         const selectEl = document.getElementById('wbap-tiagang-prompt-select');
         const descriptionEl = document.getElementById('wbap-tiagang-prompt-description');
         if (!selectEl || !descriptionEl) return;
@@ -1314,14 +1304,18 @@
         const config = WBAP.CharacterManager ? WBAP.CharacterManager.getCurrentCharacterConfig() : WBAP.config;
         if (!config) return;
         const tgCfg = ensureTiagangConfig(config);
-        const prompts = Array.isArray(tgCfg.prompts) ? tgCfg.prompts : [];
+
+        // 修复：从全局池读取提示词
+        const pools = WBAP.getGlobalPools();
+        const prompts = Array.isArray(pools.prompts?.tiangang) ? pools.prompts.tiangang : [];
+
         const idx = tgCfg.selectedPromptIndex ?? 0;
         const prompt = prompts[idx];
         if (!prompt) return;
 
         const variables = prompt.variables || {};
         const updateVariable = (key, value) => {
-            const latest = tgCfg.prompts?.[idx];
+            const latest = prompts[idx];
             if (!latest) return;
             latest.variables = { ...(latest.variables || {}), [key]: value };
             WBAP.saveConfig();
@@ -2582,7 +2576,14 @@
 
         const config = WBAP.CharacterManager.getCurrentCharacterConfig();
         const tgCfg = ensureTiagangConfig(config);
-        const prompts = Array.isArray(tgCfg.prompts) ? tgCfg.prompts : [];
+
+        // 修复：从全局池读取和保存提示词
+        const pools = WBAP.getGlobalPools();
+        if (!pools.prompts) pools.prompts = {};
+        if (!Array.isArray(pools.prompts.tiangang)) {
+            pools.prompts.tiangang = [];
+        }
+        const prompts = pools.prompts.tiangang;
 
         const newPromptData = {
             name: name,
@@ -2616,7 +2617,6 @@
         }
 
         tgCfg.selectedPromptIndex = targetIndex;
-        tgCfg.prompts = prompts;
         WBAP.saveConfig();
         refreshTiagangPromptList();
         closePromptEditor();
@@ -2625,7 +2625,11 @@
     function deleteTiagangPrompt() {
         const config = WBAP.CharacterManager.getCurrentCharacterConfig();
         const tgCfg = ensureTiagangConfig(config);
-        const prompts = Array.isArray(tgCfg.prompts) ? tgCfg.prompts : [];
+
+        // 修复：从全局池读取和删除提示词
+        const pools = WBAP.getGlobalPools();
+        const prompts = Array.isArray(pools.prompts?.tiangang) ? pools.prompts.tiangang : [];
+
         if (prompts.length <= 1) {
             alert('\u81f3\u5c11\u4fdd\u7559\u4e00\u4e2a\u5929\u7eb2\u63d0\u793a\u8bcd\u9884\u8bbe\u3002');
             return;
@@ -2635,7 +2639,6 @@
         if (!confirm(`\u786e\u5b9a\u5220\u9664\u9884\u8bbe\u300c${target?.name || '\u672a\u547d\u540d'}\u300d\u5417\uff1f`)) return;
         prompts.splice(idx, 1);
         tgCfg.selectedPromptIndex = Math.max(0, Math.min(idx, prompts.length - 1));
-        tgCfg.prompts = prompts;
         WBAP.saveConfig();
         refreshTiagangPromptList();
     }
@@ -2643,7 +2646,11 @@
     function exportTiagangPrompt() {
         const config = WBAP.CharacterManager.getCurrentCharacterConfig();
         const tgCfg = ensureTiagangConfig(config);
-        const prompts = Array.isArray(tgCfg.prompts) ? tgCfg.prompts : [];
+
+        // 修复：从全局池读取提示词
+        const pools = WBAP.getGlobalPools();
+        const prompts = Array.isArray(pools.prompts?.tiangang) ? pools.prompts.tiangang : [];
+
         const idx = tgCfg.selectedPromptIndex ?? 0;
         const prompt = prompts[idx];
         if (!prompt) {
@@ -2678,14 +2685,45 @@
         }
         parsed.variables = prompt.variables || { sulv1: '', sulv2: '', sulv3: '', sulv4: '' };
 
+        // 修复：存储到全局提示词池而不是角色配置
+        const pools = WBAP.getGlobalPools();
+        if (!pools.prompts) pools.prompts = {};
+        if (!Array.isArray(pools.prompts.tiangang)) {
+            pools.prompts.tiangang = [];
+        }
+
+        // 检查是否已存在同名提示词
+        const existingIndex = pools.prompts.tiangang.findIndex(p => p.name === parsed.name);
+        if (existingIndex >= 0) {
+            // 如果存在同名，询问是否覆盖
+            if (confirm(`已存在名为"${parsed.name}"的天纲提示词，是否覆盖？`)) {
+                pools.prompts.tiangang[existingIndex] = parsed;
+            } else {
+                // 不覆盖则添加序号
+                let newName = parsed.name;
+                let counter = 2;
+                while (pools.prompts.tiangang.some(p => p.name === newName)) {
+                    newName = `${parsed.name} (${counter})`;
+                    counter++;
+                }
+                parsed.name = newName;
+                pools.prompts.tiangang.push(parsed);
+            }
+        } else {
+            pools.prompts.tiangang.push(parsed);
+        }
+
+        // 更新角色配置的选中索引
         const config = WBAP.CharacterManager.getCurrentCharacterConfig();
         const tgCfg = ensureTiagangConfig(config);
-        const prompts = Array.isArray(tgCfg.prompts) ? tgCfg.prompts : [];
-        prompts.push(parsed);
-        tgCfg.prompts = prompts;
-        tgCfg.selectedPromptIndex = prompts.length - 1;
+        const newIndex = pools.prompts.tiangang.findIndex(p => p.name === parsed.name);
+        if (newIndex >= 0) {
+            tgCfg.selectedPromptIndex = newIndex;
+        }
+
         WBAP.saveConfig();
         refreshTiagangPromptList();
+        Logger.log(`天纲提示词"${parsed.name}"已成功导入到全局池`);
     }
 
     function exportCurrentPrompt() {
@@ -3339,7 +3377,11 @@
 
         const config = WBAP.CharacterManager.getCurrentCharacterConfig();
         const tgCfg = ensureTiagangConfig(config);
-        const prompts = Array.isArray(tgCfg.prompts) ? tgCfg.prompts : [];
+
+        // 修复：从全局池读取提示词
+        const pools = WBAP.getGlobalPools();
+        const prompts = Array.isArray(pools.prompts?.tiangang) ? pools.prompts.tiangang : [];
+
         const prompt = index >= 0 ? prompts[index] : null;
 
         if (index === -1 || !prompt) {
