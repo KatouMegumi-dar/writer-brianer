@@ -3986,43 +3986,4 @@
 
     window.addEventListener('resize', syncMobileRootFix);
 
-    // 配置同步检查函数
-    function validateConfigSync() {
-        try {
-            const currentKey = WBAP.CharacterManager?.currentCharacterId || 'default';
-            const expectedConfig = WBAP.mainConfig?.characterConfigs?.[currentKey];
-            const actualConfig = window.WBAP.config;
-
-            if (!expectedConfig || !actualConfig) {
-                return; // 配置未初始化，跳过检查
-            }
-
-            if (expectedConfig !== actualConfig) {
-                Logger.error(`配置不同步！当前键: ${currentKey}`);
-                Logger.error('期望配置:', expectedConfig);
-                Logger.error('实际配置:', actualConfig);
-
-                // 强制同步
-                window.WBAP.config = expectedConfig;
-
-                // 刷新UI
-                if (window.WBAP.UI) {
-                    if (typeof window.WBAP.UI.loadSettingsToUI === 'function') {
-                        WBAP.UI.loadSettingsToUI();
-                    }
-                }
-
-                if (window.toastr) {
-                    toastr.warning('检测到配置不同步，已自动修复', '配置同步');
-                }
-            }
-        } catch (e) {
-            Logger.error('配置同步检查失败', e);
-        }
-    }
-
-    // 每5秒检查一次配置同步
-    setInterval(validateConfigSync, 5000);
-    Logger.log('配置同步检查已启动（5秒间隔）');
-
 })();

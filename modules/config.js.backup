@@ -9,52 +9,6 @@
     const EXTENSION_NAME = 'worldbook_ai_processor';
     const MEMORY_CONFIG_VERSION = 2;
 
-    // localStorage备份相关常量
-    const BACKUP_KEY = `${EXTENSION_NAME}_backup`;
-    const BACKUP_VERSION_KEY = `${EXTENSION_NAME}_backup_version`;
-    const CURRENT_BACKUP_VERSION = 1;
-
-    // 保存配置到localStorage
-    function saveConfigToLocalStorage(config) {
-        try {
-            const backup = {
-                version: CURRENT_BACKUP_VERSION,
-                timestamp: Date.now(),
-                config: config
-            };
-            localStorage.setItem(BACKUP_KEY, JSON.stringify(backup));
-            localStorage.setItem(BACKUP_VERSION_KEY, String(CURRENT_BACKUP_VERSION));
-            Logger.log('配置已备份到localStorage');
-            return true;
-        } catch (e) {
-            Logger.error('localStorage备份失败', e);
-            return false;
-        }
-    }
-
-    // 从localStorage加载配置
-    function loadConfigFromLocalStorage() {
-        try {
-            const backupStr = localStorage.getItem(BACKUP_KEY);
-            if (!backupStr) return null;
-
-            const backup = JSON.parse(backupStr);
-            if (!backup || !backup.config) return null;
-
-            // 检查版本
-            if (backup.version !== CURRENT_BACKUP_VERSION) {
-                Logger.warn('localStorage备份版本不匹配，将忽略');
-                return null;
-            }
-
-            Logger.log('从localStorage恢复配置');
-            return backup.config;
-        } catch (e) {
-            Logger.error('从localStorage加载配置失败', e);
-            return null;
-        }
-    }
-
     function generateEndpointId(prefix = 'ep') {
         return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     }
@@ -953,60 +907,37 @@
     function loadConfig() {
         try {
             let loadedConfig = null;
-            let loadSource = 'default';
-
-            // 1. 尝试从ST读取
             if (typeof SillyTavern !== 'undefined' && SillyTavern.getContext) {
                 const { extensionSettings } = SillyTavern.getContext();
                 if (extensionSettings && extensionSettings[EXTENSION_NAME]) {
                     loadedConfig = extensionSettings[EXTENSION_NAME];
-                    loadSource = 'ST';
                     Logger.log('主配置已从 SillyTavern 读取');
                 }
             }
 
-            // 2. 如果ST配置为空或无效，尝试从localStorage恢复
-            if (!loadedConfig || !loadedConfig.characterConfigs) {
-                const backup = loadConfigFromLocalStorage();
-                if (backup && backup.characterConfigs) {
-                    loadedConfig = backup;
-                    loadSource = 'localStorage';
-                    Logger.log('从localStorage恢复配置');
-                    if (window.toastr) {
-                        toastr.info('已从本地备份恢复配置', '数据恢复');
-                    }
-                }
-            }
-
-            // 3. 如果都没有，使用默认配置
-            if (!loadedConfig || !loadedConfig.characterConfigs) {
-                mainConfig = createDefaultMainConfig();
-                ensureGlobalPools(mainConfig);
-                Logger.log('使用默认的主配置');
-                loadSource = 'default';
-            } else {
+            if (loadedConfig && loadedConfig.characterConfigs) {
                 mainConfig = loadedConfig;
                 if (!mainConfig.globalSettings) {
                     mainConfig.globalSettings = createDefaultMainConfig().globalSettings;
                 }
+
                 ensureGlobalPools(mainConfig);
 
-                // 执行配置迁移
                 if (migrateConfig(mainConfig)) {
                     Logger.log('配置已从旧版本迁移并保存');
                     saveConfig();
                 }
-            }
+
+            } else {
+                mainConfig = createDefaultMainConfig();
+                ensureGlobalPools(mainConfig);
+                Logger.log('使用默认的主配置');
+                            }
 
             window.WBAP.mainConfig = mainConfig;
             window.WBAP.DEFAULT_CONFIG = createDefaultCharacterConfig();
             window.WBAP.createDefaultCharacterConfig = createDefaultCharacterConfig;
-
-            // 初始化角色管理器
             WBAP.CharacterManager.initialize();
-
-            // 记录加载来源
-            Logger.log(`配置加载完成，来源: ${loadSource}`);
 
         } catch (e) {
             Logger.error('加载主配置失败', e);
@@ -1020,10 +951,6 @@
 
     function saveConfig() {
         try {
-            // 1. 先保存到localStorage（立即生效）
-            const backupSuccess = saveConfigToLocalStorage(window.WBAP.mainConfig);
-
-            // 2. 再保存到ST配置
             if (typeof SillyTavern !== 'undefined' && SillyTavern.getContext) {
                 const { extensionSettings, saveSettingsDebounced } = SillyTavern.getContext();
                 if (extensionSettings) {
@@ -1033,17 +960,8 @@
                     }
                 }
             }
-
-            // 3. 如果localStorage备份失败，通知用户
-            if (!backupSuccess && window.toastr) {
-                toastr.warning('配置备份失败，请检查浏览器存储空间', '警告');
-            }
         } catch (e) {
             Logger.error('保存主配置失败', e);
-            // 通知用户
-            if (window.toastr) {
-                toastr.error('配置保存失败，请重试', '错误');
-            }
         }
     }
 

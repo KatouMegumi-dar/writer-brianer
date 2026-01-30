@@ -7,32 +7,81 @@
     const Logger = WBAP.Logger;
 
     let currentCharacterId = null;
-    let transientConfig = null;
 
     function normalizeCharacterKey(id) {
         if (id === null || id === undefined) return null;
         return String(id);
     }
 
+    // 增强的角色配置查找函数
+    function findCharacterConfig(targetId) {
+        const mainConfig = WBAP.mainConfig;
+        if (!mainConfig?.characterConfigs) return null;
+
+        // 1. 精确匹配
+        if (mainConfig.characterConfigs[targetId]) {
+            return { key: targetId, config: mainConfig.characterConfigs[targetId] };
+        }
+
+        // 2. 尝试数字/字符串转换
+        const numId = Number(targetId);
+        if (!isNaN(numId) && mainConfig.characterConfigs[numId]) {
+            return { key: numId, config: mainConfig.characterConfigs[numId] };
+        }
+        const strId = String(targetId);
+        if (mainConfig.characterConfigs[strId]) {
+            return { key: strId, config: mainConfig.characterConfigs[strId] };
+        }
+
+        // 3. 尝试通过avatar匹配
+        try {
+            const context = SillyTavern.getContext();
+            const avatar = context?.character?.avatar_file_name;
+            if (avatar && mainConfig.characterConfigs[avatar]) {
+                return { key: avatar, config: mainConfig.characterConfigs[avatar] };
+            }
+        } catch (e) {
+            // ignore
+        }
+
+        // 4. 尝试模糊匹配（去除特殊字符）
+        const normalized = String(targetId).replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        if (normalized) {
+            for (const [key, config] of Object.entries(mainConfig.characterConfigs)) {
+                const keyNormalized = String(key).replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+                if (keyNormalized === normalized) {
+                    return { key, config };
+                }
+            }
+        }
+
+        return null;
+    }
+
     function migrateCharacterConfigKey(targetId, legacyId, legacyAvatar) {
         const key = normalizeCharacterKey(targetId);
         if (!key) return;
+
         const mainConfig = WBAP.mainConfig;
         if (!mainConfig?.characterConfigs) return;
+
+        // 如果目标键已存在，不迁移
         if (mainConfig.characterConfigs[key]) return;
 
-        const legacyKey = normalizeCharacterKey(legacyId);
-        let legacy = legacyKey ? mainConfig.characterConfigs[legacyKey] : null;
-        if (!legacy && legacyAvatar) legacy = mainConfig.characterConfigs[legacyAvatar];
-        if (!legacy) return;
+        // 尝试找到旧配置（使用增强的查找函数）
+        const found = findCharacterConfig(legacyId) || findCharacterConfig(legacyAvatar);
+        if (!found) return;
 
-        mainConfig.characterConfigs[key] = legacy;
-        if (legacyKey && mainConfig.characterConfigs[legacyKey]) delete mainConfig.characterConfigs[legacyKey];
-        if (legacyAvatar && mainConfig.characterConfigs[legacyAvatar]) delete mainConfig.characterConfigs[legacyAvatar];
+        // 迁移配置
+        mainConfig.characterConfigs[key] = found.config;
+
+        // 不立即删除旧配置，保留作为备份
+        // 可以在下次启动时清理（通过版本号标记）
+
         if (typeof WBAP.saveConfig === 'function') {
             WBAP.saveConfig();
         }
-        Logger.log(`已迁移角色配置键: ${legacyKey || legacyAvatar} -> ${key}`);
+        Logger.log(`已迁移角色配置: ${found.key} -> ${key}`);
     }
 
     function resolveCurrentCharacterId() {
@@ -50,22 +99,15 @@
         }
     }
 
-    function createTransientConfig() {
-        if (transientConfig) return transientConfig;
-        const createDefault = WBAP.createDefaultCharacterConfig;
-        transientConfig = (typeof createDefault === 'function')
-            ? createDefault()
-            : JSON.parse(JSON.stringify(WBAP.DEFAULT_CONFIG || {}));
-        return transientConfig;
-    }
-
     // 获取当前角色的配置
     function getCurrentCharacterConfig() {
         const mainConfig = WBAP.mainConfig;
-        // 在插件完全加载前，如果被调用，提供一个临时的空配置以避免崩溃
+
+        // 在插件完全加载前，如果被调用，返回默认配置
         if (!mainConfig) {
             Logger.warn('getCurrentCharacterConfig 在 mainConfig 初始化前被调用。');
-            return createTransientConfig();
+            const createDefault = WBAP.createDefaultCharacterConfig;
+            return createDefault ? createDefault() : JSON.parse(JSON.stringify(WBAP.DEFAULT_CONFIG || {}));
         }
 
         if (!mainConfig.characterConfigs) {
@@ -75,58 +117,46 @@
         if (!currentCharacterId) {
             currentCharacterId = resolveCurrentCharacterId();
         }
-        if (!currentCharacterId) {
-            if (!transientConfig && window.WBAP?.config) {
-                transientConfig = window.WBAP.config;
-            }
-            return createTransientConfig();
-        }
 
-        if (!mainConfig.characterConfigs[currentCharacterId]) {
-            Logger.log(`为角色${currentCharacterId} 创建新的默认配置。`);
+        // 使用'default'作为主页配置键，而不是临时配置
+        const key = currentCharacterId || 'default';
+
+        if (!mainConfig.characterConfigs[key]) {
+            Logger.log(`为${key === 'default' ? '主页' : '角色 ' + key}创建新的默认配置。`);
             const createDefault = WBAP.createDefaultCharacterConfig;
-            mainConfig.characterConfigs[currentCharacterId] = createDefault
+            mainConfig.characterConfigs[key] = createDefault
                 ? createDefault()
                 : JSON.parse(JSON.stringify(WBAP.DEFAULT_CONFIG));
+
+            // 立即保存新创建的配置
+            if (typeof WBAP.saveConfig === 'function') {
+                WBAP.saveConfig();
+            }
         }
-        
+
         // 始终返回当前角色的配置
-        return mainConfig.characterConfigs[currentCharacterId];
+        return mainConfig.characterConfigs[key];
     }
 
     // 切换角色时调用的函数
     function switchCharacter(characterId) {
-        if (characterId === null || characterId === undefined || characterId === '') {
-            Logger.log('Switching to home: using transient config');
-            currentCharacterId = null;
-            window.WBAP.config = createTransientConfig();
-            if (window.WBAP.UI) {
-                if (typeof window.WBAP.UI.loadSettingsToUI === 'function') {
-                    WBAP.UI.loadSettingsToUI();
-                }
-                if (typeof window.WBAP.UI.refreshPromptList === 'function') {
-                    WBAP.UI.refreshPromptList();
-                }
-                if (typeof window.WBAP.UI.renderApiEndpoints === 'function') {
-                    WBAP.UI.renderApiEndpoints();
-                }
-            }
-            return;
-        }
+        // 使用'default'作为主页配置键
+        const key = characterId || 'default';
 
-        if (currentCharacterId === characterId) return; // 角色未改变
+        // 如果角色未改变，直接返回
+        if (currentCharacterId === key) return;
 
-        Logger.log(`切换到角色 ${characterId}`);
-        currentCharacterId = characterId;
+        Logger.log(`切换到${key === 'default' ? '主页' : '角色 ' + key}`);
+        currentCharacterId = key;
 
         // 更新全局的活动配置对象
         window.WBAP.config = getCurrentCharacterConfig();
 
-        // 重新加载提示词（因为角色切换了）
-        if (window.WBAP.PromptManager && typeof window.WBAP.PromptManager.loadUserPrompts === 'function') {
-            // 注意：loadUserPrompts 不是公开接口，我们需要通过重新初始化或直接访问内部逻辑
-            // 但更好的方式是让 PromptManager 在每次调用时都从当前配置读取
-            // 暂时先刷新 UI，UI 会触发 PromptManager 的读取
+        // 保存当前角色到localStorage（用于恢复）
+        try {
+            localStorage.setItem('WBAP_current_character', key);
+        } catch (e) {
+            Logger.warn('无法保存当前角色到localStorage', e);
         }
 
         // 通知UI刷新
@@ -147,69 +177,77 @@
     function initialize() {
         if (typeof SillyTavern !== 'undefined' && SillyTavern.getContext) {
             const context = SillyTavern.getContext();
-            let eventListenerAttached = false;
+            let lastCharacterId = null;
+            let eventListenerCount = 0;
 
-            // 方案A: 监听角色加载事件 (最佳)
-            if (context.eventSource && context.event_types?.CHARACTER_LOADED) {
-                context.eventSource.on(context.event_types.CHARACTER_LOADED, (character) => {
-                    const ctx = SillyTavern.getContext?.();
-                    const rawId = (ctx && ctx.characterId !== undefined && ctx.characterId !== null)
-                        ? ctx.characterId
-                        : (character?.id ?? null);
+            // 统一的切换处理函数
+            const handleCharacterSwitch = () => {
+                try {
+                    const context = SillyTavern.getContext();
+                    const rawId = (context && context.characterId !== undefined && context.characterId !== null)
+                        ? context.characterId
+                        : (context?.character?.id ?? null);
                     const id = normalizeCharacterKey(rawId);
-                    if (id) migrateCharacterConfigKey(id, character?.id, character?.avatar_file_name || null);
-                    switchCharacter(id);
-                });
-                Logger.log('已成功监听角色加载事件(CHARACTER_LOADED)。');
-                eventListenerAttached = true;
-            }
 
-            // 方案B: 监听聊天切换事件 (备用)
-         if (context.eventSource && context.event_types?.CHAT_CHANGED) {
-                 context.eventSource.on(context.event_types.CHAT_CHANGED, () => {
-                    setTimeout(() => { // 延迟一点以确保上下文已更新
-                        try {
-                            const freshContext = SillyTavern.getContext();
-                            const rawId = (freshContext && freshContext.characterId !== undefined && freshContext.characterId !== null)
-                                ? freshContext.characterId
-                                : (freshContext.character?.id ?? null);
-                            const id = normalizeCharacterKey(rawId);
-                            if (id) migrateCharacterConfigKey(id, freshContext.character?.id, freshContext.character?.avatar_file_name || null);
-                            switchCharacter(id);
-                        } catch(e) {
-                            Logger.error("在 CHAT_CHANGED 事件处理中发生错误", e);
-                        }
-                    }, 100);
-                });
-                Logger.log('已成功监听聊天切换事件(CHAT_CHANGED) 作为备用触发器。');
-                eventListenerAttached = true;
-            }
+                    // 只在ID真正变化时才切换
+                    if (id !== lastCharacterId) {
+                        Logger.log(`检测到角色变化: ${lastCharacterId || 'null'} -> ${id || 'null'}`);
+                        lastCharacterId = id;
 
-            // 方案C: 轮询 (最终后备)
-            if (!eventListenerAttached) {
-                Logger.warn('无法监听任何相关的切换事件，将启用轮询模式检测角色变更。');
-                let lastChar = null;
-                setInterval(() => {
-                    try {
-                        const ctx = SillyTavern.getContext();
-                        const rawId = (ctx && ctx.characterId !== undefined && ctx.characterId !== null)
-                            ? ctx.characterId
-                            : (ctx?.character?.id ?? null);
-                        const current = normalizeCharacterKey(rawId);
-                        if (current) migrateCharacterConfigKey(current, ctx?.character?.id, ctx?.character?.avatar_file_name || null);
-                        if (current !== lastChar) {
-                            lastChar = current;
-                            switchCharacter(current);
+                        if (id) {
+                            migrateCharacterConfigKey(id, context?.character?.id, context?.character?.avatar_file_name);
                         }
-                    } catch (e) {
-                        // ignore
+
+                        switchCharacter(id);
                     }
-                }, 1500); // 1.5s 轮询
+                } catch (e) {
+                    Logger.error('处理角色切换时出错', e);
+                }
+            };
+
+            // 方案A: CHARACTER_LOADED事件
+            if (context.eventSource && context.event_types?.CHARACTER_LOADED) {
+                context.eventSource.on(context.event_types.CHARACTER_LOADED, () => {
+                    eventListenerCount++;
+                    handleCharacterSwitch();
+                });
+                Logger.log('已监听CHARACTER_LOADED事件');
             }
+
+            // 方案B: CHAT_CHANGED事件
+            if (context.eventSource && context.event_types?.CHAT_CHANGED) {
+                context.eventSource.on(context.event_types.CHAT_CHANGED, () => {
+                    eventListenerCount++;
+                    // 不使用setTimeout，立即处理
+                    handleCharacterSwitch();
+                });
+                Logger.log('已监听CHAT_CHANGED事件');
+            }
+
+            // 方案C: 轮询（始终启用，作为兜底）
+            setInterval(() => {
+                // 如果事件监听正常工作，轮询不会触发切换（因为ID未变化）
+                // 如果事件失效，轮询会接管
+                handleCharacterSwitch();
+            }, 1000); // 1秒轮询
+            Logger.log('已启动角色切换轮询检测（1秒间隔）');
+
+            // 监控事件监听器是否正常工作
+            setInterval(() => {
+                const count = eventListenerCount;
+                eventListenerCount = 0;
+                if (count === 0) {
+                    Logger.warn('事件监听器可能失效，已降级到轮询模式');
+                }
+            }, 10000); // 每10秒检查一次
+
+            // 初始化时立即执行一次
+            handleCharacterSwitch();
+
         } else {
             Logger.warn('SillyTavern 上下文不可用，无法实现角色配置绑定。');
         }
-        
+
         // 初始化时，立即设置一次当前角色的配置
         window.WBAP.config = getCurrentCharacterConfig();
     }
@@ -218,7 +256,10 @@
     window.WBAP.CharacterManager = {
         initialize,
         getCurrentCharacterConfig,
-        switchCharacter
+        switchCharacter,
+        get currentCharacterId() {
+            return currentCharacterId;
+        }
     };
 
 })();
