@@ -130,20 +130,58 @@
                 : Promise.resolve('');
 
             const analysisPromise = runSelectiveModeProcessing(originalInput.trim(), null, context).catch(err => {
-                Logger.warn('自选模式处理失败，已跳过', err);
+                Logger.error('自选模式处理失败', err);
+                // 显示用户友好的错误提示
+                if (window.toastr) {
+                    const errorMsg = err.message || '未知错误';
+                    if (errorMsg.includes('没有可用的提示词')) {
+                        toastr.error('请先创建或导入提示词', '分析失败');
+                    } else if (errorMsg.includes('未找到可用的 API 端点')) {
+                        toastr.error('请先配置API端点', '分析失败');
+                    } else if (errorMsg.includes('No executable tasks found')) {
+                        toastr.error('请为API端点绑定世界书和条目', '分析失败');
+                    } else if (errorMsg.includes('用户取消')) {
+                        toastr.info('已取消分析', '提示');
+                    } else {
+                        toastr.error(`分析失败: ${errorMsg}`, '错误');
+                    }
+                }
                 return '';
             });
 
             // 等待所有任务完成
             const [memoryBlock, analysisResult] = await Promise.all([memoryPromise, analysisPromise]);
 
+            // 调试日志
+            Logger.log(`记忆模块结果: ${memoryBlock ? '有内容' : '无内容'} (${memoryBlock?.length || 0} 字符)`);
+            Logger.log(`分析结果: ${analysisResult ? '有内容' : '无内容'} (${analysisResult?.length || 0} 字符)`);
+
             // 合并结果
             let finalOutput = originalInput;
-            if (memoryBlock) {
+            let hasInjection = false;
+
+            if (memoryBlock && memoryBlock.trim()) {
                 finalOutput = `${finalOutput}\n\n${memoryBlock}`;
+                hasInjection = true;
+                Logger.log('✓ 记忆模块结果已添加');
             }
-            if (analysisResult) {
+            if (analysisResult && analysisResult.trim()) {
                 finalOutput = `${finalOutput}\n\n${analysisResult}`;
+                hasInjection = true;
+                Logger.log('✓ 分析结果已添加');
+            }
+
+            // 如果没有任何注入内容，提示用户
+            if (!hasInjection) {
+                Logger.warn('⚠ 没有生成任何分析结果，请检查配置');
+                if (window.toastr) {
+                    toastr.warning('没有生成分析结果，请检查配置（API端点、世界书、提示词）', '提示', {
+                        timeOut: 5000
+                    });
+                }
+                // 仍然允许发送原始消息
+            } else {
+                Logger.log(`✓ 最终输出长度: ${finalOutput.length} 字符`);
             }
 
             textarea.value = finalOutput;

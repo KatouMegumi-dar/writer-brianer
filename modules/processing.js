@@ -833,14 +833,22 @@
 
             const endpoints = getSelectiveEndpoints();
             if (endpoints.length === 0) {
-                Logger.warn('未找到可用的 API 端点。');
-                return null;
+                Logger.error('❌ 未找到可用的 API 端点');
+                Logger.error('请在扩展设置中配置至少一个API端点');
+                if (window.toastr) {
+                    toastr.error('请先配置API端点', '配置错误', { timeOut: 5000 });
+                }
+                throw new Error('未找到可用的 API 端点');
             }
 
             const allEndpoints = endpoints.filter(ep => ep && ep.enabled !== false);
             if (allEndpoints.length === 0) {
-                Logger.warn('所有 API 端点均被禁用，已跳过处理。');
-                return null;
+                Logger.error('❌ 所有 API 端点均被禁用');
+                Logger.error('请在扩展设置中启用至少一个API端点');
+                if (window.toastr) {
+                    toastr.error('所有API端点都已禁用，请启用至少一个', '配置错误', { timeOut: 5000 });
+                }
+                throw new Error('所有 API 端点均被禁用');
             }
             const endpointsToProcessRaw = bookName
                 ? allEndpoints.filter(ep => {
@@ -1017,8 +1025,15 @@
             }
 
             if (baseTasks.length === 0) {
-                Logger.log('No executable tasks found. 请检查 API 实例是否选择了世界书/条目。');
-                return null;
+                Logger.error('❌ 没有可执行的任务');
+                Logger.error('可能的原因:');
+                Logger.error('  1. API端点未绑定世界书');
+                Logger.error('  2. 世界书中没有匹配的条目');
+                Logger.error('  3. 世界书未在SillyTavern中选择');
+                if (window.toastr) {
+                    toastr.error('请为API端点绑定世界书，并确保世界书中有匹配的条目', '配置错误', { timeOut: 5000 });
+                }
+                throw new Error('No executable tasks found. 请检查 API 实例是否选择了世界书/条目。');
             }
 
             const tagContextByEndpointId = new Map();
@@ -1034,6 +1049,11 @@
             // 选择提示词，并根据绑定的 API 分流任务
             const combinedPrompts = WBAP.PromptManager.getCombinedPrompts();
             if (!Array.isArray(combinedPrompts) || combinedPrompts.length === 0) {
+                Logger.error('❌ 没有可用的提示词');
+                Logger.error('请在扩展设置中创建或导入提示词');
+                if (window.toastr) {
+                    toastr.error('请先创建或导入提示词', '配置错误', { timeOut: 5000 });
+                }
                 throw new Error('没有可用的提示词，请先创建或导入。');
             }
             const promptSelections = [];
@@ -1303,7 +1323,20 @@
             }
 
             if (successfulResults.length === 0) {
-                Logger.warn('All analysis tasks returned no result; nothing will be injected.');
+                Logger.error('❌ 所有分析任务都未返回结果');
+                Logger.error('可能的原因:');
+                Logger.error('  1. API端点配置错误或无法访问');
+                Logger.error('  2. 世界书或条目未正确绑定');
+                Logger.error('  3. 提示词配置错误');
+                Logger.error('  4. API返回了错误响应');
+
+                // 显示用户友好的错误提示
+                if (window.toastr) {
+                    toastr.error('所有分析任务都失败了，请检查配置和网络连接', '分析失败', {
+                        timeOut: 5000
+                    });
+                }
+
                 return null;
             }
 

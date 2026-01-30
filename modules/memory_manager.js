@@ -26,10 +26,51 @@
 {user_input}
 [/核心处理内容]
 </数据注入区>`;
+
     const DEFAULT_VARIABLES = { sulv1: '0.6', sulv2: '8', sulv3: '6', sulv4: '' };
 
-    const CATEGORY_CACHE = new Map();
-    const WORLDBOOK_TYPE_CACHE = new Map(); // 缓存世界书类型检测结果
+    // LRU缓存实现 - 防止内存无限增长
+    class LRUCache {
+        constructor(maxSize = 50) {
+            this.cache = new Map();
+            this.maxSize = maxSize;
+        }
+
+        get(key) {
+            if (!this.cache.has(key)) return undefined;
+            const value = this.cache.get(key);
+            // 移到最后（最近使用）
+            this.cache.delete(key);
+            this.cache.set(key, value);
+            return value;
+        }
+
+        set(key, value) {
+            if (this.cache.has(key)) {
+                this.cache.delete(key);
+            } else if (this.cache.size >= this.maxSize) {
+                // 删除最旧的项（第一个）
+                const firstKey = this.cache.keys().next().value;
+                this.cache.delete(firstKey);
+            }
+            this.cache.set(key, value);
+        }
+
+        has(key) {
+            return this.cache.has(key);
+        }
+
+        clear() {
+            this.cache.clear();
+        }
+
+        get size() {
+            return this.cache.size;
+        }
+    }
+
+    const CATEGORY_CACHE = new LRUCache(50);  // 最多缓存50个世界书的分类
+    const WORLDBOOK_TYPE_CACHE = new LRUCache(100);  // 最多缓存100个世界书的类型检测结果
     let defaultPresetPromise = null;
 
     function createDefaultMemoryEndpoint() {
@@ -929,9 +970,16 @@
             return;
         }
         box.innerHTML = '<div class="wbap-text-muted"><i class="fa-solid fa-spinner fa-spin"></i> 加载分类...</div>';
+
+        // 优化：并发加载所有世界书的分类，而不是顺序加载
+        const loadPromises = mem.selectedTableBooks.map(name =>
+            loadTableCategories(name).then(cats => ({ name, cats }))
+        );
+
+        const results = await Promise.all(loadPromises);
+
         const parts = [];
-        for (const name of mem.selectedTableBooks) {
-            const cats = await loadTableCategories(name);
+        for (const { name, cats } of results) {
             if (!cats.length) {
                 parts.push(`<div class="wbap-text-muted" style="margin-bottom:8px;">${name} 未检测到分类</div>`);
                 continue;
@@ -1156,13 +1204,117 @@
         }
     }
 
+    function escapeRegex(str) {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    /**
+     * 验证记忆模块配置
+     * @param {Object} mem - 记忆配置对象
+     * @returns {Object} { valid: boolean, errors: string[], warnings: string[] }
+     */
+    function validateMemoryConfig(mem) {
+        const errors = [];
+        const warnings = [];
+
+        if (!mem) {
+            errors.push('记忆配置对象不存在');
+            return { valid: false, errors, warnings };
+        }
+
+        // 如果未启用，跳过验证
+        if (!mem.enabled) {
+            return { valid: true, errors: [], warnings: [] };
+        }
+
+        // 检查是否选择了世界书
+        const hasTableBooks = mem.selectedTableBooks && mem.selectedTableBooks.length > 0;
+        const hasSummaryBooks = mem.selectedSummaryBooks && mem.selectedSummaryBooks.length > 0;
+
+        if (!hasTableBooks && !hasSummaryBooks) {
+            errors.push('请至少选择一个世界书（表格书或总结书）');
+        }
+
+        // 检查API端点配置
+        const pool = getMemoryPool();
+        if (!pool.apiEndpoints || pool.apiEndpoints.length === 0) {
+            errors.push('请至少配置一个记忆API端点');
+        } else {
+            // 检查是否有完整配置的端点
+            const validEndpoints = pool.apiEndpoints.filter(ep =>
+                ep.apiUrl && ep.apiUrl.trim() && ep.model && ep.model.trim()
+            );
+
+            if (validEndpoints.length === 0) {
+                errors.push('请完整配置至少一个API端点（URL和模型不能为空）');
+            } else if (validEndpoints.length < pool.apiEndpoints.length) {
+                warnings.push(`有 ${pool.apiEndpoints.length - validEndpoints.length} 个API端点配置不完整`);
+            }
+        }
+
+        // 检查预设
+        if (!mem.selectedPresetId) {
+            warnings.push('未选择记忆预设，将使用默认预设');
+        } else {
+            const presets = pool.presets || [];
+            const presetExists = presets.some(p => p.id === mem.selectedPresetId);
+            if (!presetExists && mem.selectedPresetId !== DEFAULT_PRESET_ID) {
+                warnings.push(`选择的预设 "${mem.selectedPresetId}" 不存在，将使用默认预设`);
+            }
+        }
+
+        // 检查表格书的端点配置
+        if (hasTableBooks) {
+            const unconfiguredBooks = [];
+            for (const bookName of mem.selectedTableBooks) {
+                const endpoints = mem.tableCategoryEndpoints?.[bookName];
+                if (!endpoints || Object.keys(endpoints).length === 0) {
+                    unconfiguredBooks.push(bookName);
+                }
+            }
+            if (unconfiguredBooks.length > 0) {
+                warnings.push(`以下表格书未配置API端点: ${unconfiguredBooks.join(', ')}`);
+            }
+        }
+
+        // 检查总结书的端点配置
+        if (hasSummaryBooks) {
+            const unconfiguredBooks = [];
+            for (const bookName of mem.selectedSummaryBooks) {
+                const endpointId = mem.summaryEndpoints?.[bookName];
+                if (!endpointId) {
+                    unconfiguredBooks.push(bookName);
+                }
+            }
+            if (unconfiguredBooks.length > 0) {
+                warnings.push(`以下总结书未配置API端点: ${unconfiguredBooks.join(', ')}`);
+            }
+        }
+
+        return {
+            valid: errors.length === 0,
+            errors,
+            warnings
+        };
+    }
+
     function applyVariables(text, vars = {}) {
-        let output = text || '';
-        Object.entries(vars).forEach(([k, v]) => {
-            // 使用占位符格式 {变量名} 进行替换
-            output = output.replaceAll(`{${k}}`, v == null ? '' : String(v));
+        if (!text || Object.keys(vars).length === 0) return text || '';
+
+        // 优化：使用正则表达式一次性替换所有变量，而不是多次遍历字符串
+        const keys = Object.keys(vars);
+        if (keys.length === 0) return text;
+
+        const pattern = new RegExp(
+            keys.map(k => `\\{${escapeRegex(k)}\\}`).join('|'),
+            'g'
+        );
+
+        return text.replace(pattern, match => {
+            const key = match.slice(1, -1);  // 移除 { 和 }
+            const value = vars[key];
+            return value == null ? '' : String(value);
         });
-        return output;
     }
 
     function buildMemoryBlock({ userInput = '', context = '', worldbookContent = '', tableContent = '', preset }) {
@@ -1412,19 +1564,85 @@
         return parts.join('\n');
     }
 
-    async function callMemoryEndpoint(block, endpoint, modelOverride = '') {
+    async function callMemoryEndpoint(block, endpoint, modelOverride = '', signal = null, retries = 2) {
         if (!WBAP.callAI || !endpoint) return `${block.system}\n\n${block.user}`;
-        try {
-            return await WBAP.callAI(modelOverride || block.model || endpoint.model || '', block.user, block.system, endpoint);
-        } catch (e) {
-            Logger.error(TAG, 'memory endpoint failed', e);
-            return `${block.system}\n\n${block.user}`;
+
+        for (let attempt = 0; attempt <= retries; attempt++) {
+            try {
+                // 检查是否已取消
+                if (signal?.aborted) {
+                    throw new Error('Task cancelled');
+                }
+
+                // 创建API配置并传递signal
+                const apiConfig = {
+                    ...endpoint,
+                    signal: signal
+                };
+
+                return await WBAP.callAI(
+                    modelOverride || block.model || endpoint.model || '',
+                    block.user,
+                    block.system,
+                    apiConfig
+                );
+            } catch (e) {
+                // 检查是否是取消错误 - 不重试
+                if (e.name === 'AbortError' || e.message === 'Task cancelled') {
+                    Logger.log(TAG, 'memory endpoint cancelled');
+                    throw e;  // 重新抛出取消错误
+                }
+
+                // 如果还有重试次数，继续重试
+                if (attempt < retries) {
+                    const delay = 1000 * (attempt + 1);  // 递增延迟：1s, 2s
+                    Logger.log(TAG, `memory endpoint failed, retrying in ${delay}ms (${attempt + 1}/${retries})`, e.message);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    continue;
+                }
+
+                // 所有重试都失败
+                Logger.error(TAG, 'memory endpoint failed after retries', e);
+                return `${block.system}\n\n${block.user}`;
+            }
         }
     }
 
     async function processMessage(options = {}) {
         const mem = ensureMemoryConfig();
         if (!mem.enabled) return '';
+
+        // 验证配置
+        const validation = validateMemoryConfig(mem);
+
+        // 如果有错误，记录并提示用户
+        if (!validation.valid) {
+            Logger.error(TAG, '记忆模块配置无效:', validation.errors);
+            if (window.toastr) {
+                toastr.error(
+                    validation.errors.join('\n'),
+                    '记忆模块配置错误',
+                    { timeOut: 5000 }
+                );
+            }
+            return '';
+        }
+
+        // 如果有警告，记录但继续执行
+        if (validation.warnings.length > 0) {
+            Logger.warn(TAG, '记忆模块配置警告:', validation.warnings);
+            // 只在第一次显示警告
+            if (!mem._warningShown) {
+                if (window.toastr) {
+                    toastr.warning(
+                        validation.warnings.join('\n'),
+                        '记忆模块配置提示',
+                        { timeOut: 4000 }
+                    );
+                }
+                mem._warningShown = true;  // 标记已显示，避免重复提示
+            }
+        }
 
         let userInput = '';
         let context = '';
@@ -1445,6 +1663,34 @@
         const preset = await ensureDefaultPreset(mem);
         const config = getCharacterConfig();
         const showProgress = config?.showProgressPanel && WBAP.UI;
+
+        // 创建AbortController用于取消任务
+        const abortControllers = new Map();
+        let abortAllRequested = false;
+
+        // 取消全部任务的函数
+        const abortAll = () => {
+            abortAllRequested = true;
+            Logger.log(TAG, '取消全部记忆模块任务');
+            abortControllers.forEach((controller, taskId) => {
+                controller.abort();
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(taskId, '已取消', 100);
+                }
+            });
+        };
+
+        // 取消单个任务的函数
+        const cancelSingleTask = (taskId) => {
+            const controller = abortControllers.get(taskId);
+            if (controller) {
+                Logger.log(TAG, `取消记忆模块任务: ${taskId}`);
+                controller.abort();
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(taskId, '已取消', 100);
+                }
+            }
+        };
 
         // 收集任务信息
         const summaryTasks = [];
@@ -1493,24 +1739,62 @@
                 // 面板未打开，初始化面板
                 WBAP.UI.showProgressPanel('记忆模块处理中...', totalTasks);
             }
+
+            // 为快照任务创建AbortController
+            const snapshotController = new AbortController();
+            abortControllers.set('memory-snapshot', snapshotController);
+
             // 添加快照任务
             WBAP.UI.addProgressTask('memory-snapshot', '快照: 高维快照/短期记忆', '等待中...');
-            // 添加总结书任务
+
+            // 为总结书任务创建AbortController并添加任务
             for (const task of summaryTasks) {
+                const controller = new AbortController();
+                abortControllers.set(task.id, controller);
                 WBAP.UI.addProgressTask(task.id, task.name, '等待中...');
             }
-            // 添加表格书任务
+
+            // 为表格书任务创建AbortController并添加任务
             for (const task of tableTasks) {
+                const controller = new AbortController();
+                abortControllers.set(task.id, controller);
                 WBAP.UI.addProgressTask(task.id, task.name, '等待中...');
+            }
+
+            // 注册取消回调
+            if (WBAP.UI.setCancelAllCallback) {
+                WBAP.UI.setCancelAllCallback(abortAll);
+            }
+            if (WBAP.UI.setCancelTaskCallback) {
+                // 注册快照任务的取消回调
+                WBAP.UI.setCancelTaskCallback('memory-snapshot', cancelSingleTask);
+                // 注册总结书任务的取消回调
+                summaryTasks.forEach(task => {
+                    WBAP.UI.setCancelTaskCallback(task.id, cancelSingleTask);
+                });
+                // 注册表格书任务的取消回调
+                tableTasks.forEach(task => {
+                    WBAP.UI.setCancelTaskCallback(task.id, cancelSingleTask);
+                });
             }
         }
 
         // 创建快照任务（不传世界书和表格内容，只提取高维快照、短期记忆、近期片段）
         const snapshotPromise = (async () => {
+            const taskId = 'memory-snapshot';
+            const controller = abortControllers.get(taskId);
+            const signal = controller?.signal;
+
             try {
-                if (showProgress) {
-                    WBAP.UI.updateProgressTask('memory-snapshot', '处理中...', 10);
+                // 检查是否已取消
+                if (signal?.aborted) {
+                    throw new Error('Task cancelled');
                 }
+
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(taskId, '处理中...', 10);
+                }
+
                 const block = buildMemoryBlock({
                     userInput,
                     context,
@@ -1519,27 +1803,70 @@
                     preset
                 });
                 block.model = mem.model;
-                const result = await callMemoryEndpoint(block, defaultEndpoint, mem.model);
+
+                const result = await callMemoryEndpoint(block, defaultEndpoint, mem.model, signal);
+
                 if (showProgress) {
-                    WBAP.UI.updateProgressTask('memory-snapshot', '完成', 100);
+                    WBAP.UI.updateProgressTask(taskId, '完成', 100);
                 }
                 return result;
             } catch (e) {
-                Logger.error(TAG, 'snapshot task failed', e);
-                if (showProgress) {
-                    WBAP.UI.updateProgressTask('memory-snapshot', `失败: ${(e?.message || '').slice(0, 20)}`, 100);
+                // 检查是否是取消错误
+                if (e.name === 'AbortError' || e.message === 'Task cancelled') {
+                    Logger.log(TAG, 'snapshot task cancelled');
+                    if (showProgress) {
+                        WBAP.UI.updateProgressTask(taskId, '已取消', 100);
+                    }
+                    return '';
                 }
+
+                // 处理其他错误
+                const errorMsg = e.message || '未知错误';
+                Logger.error(TAG, 'snapshot task failed', e);
+
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(taskId, '失败', 100);
+                }
+
+                // 显示用户友好的错误提示
+                if (window.toastr) {
+                    if (errorMsg.includes('timeout') || errorMsg.includes('超时')) {
+                        toastr.error('记忆快照请求超时，请检查网络连接', '处理失败', { timeOut: 5000 });
+                    } else if (errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('认证')) {
+                        toastr.error('API认证失败，请检查密钥配置', '处理失败', { timeOut: 5000 });
+                    } else if (errorMsg.includes('429') || errorMsg.includes('rate limit')) {
+                        toastr.error('API请求频率超限，请稍后重试', '处理失败', { timeOut: 5000 });
+                    } else {
+                        toastr.error(`记忆快照失败: ${errorMsg}`, '错误', { timeOut: 5000 });
+                    }
+                }
+
                 return '';
             }
         })();
 
         // 创建总结书任务
         const summaryPromises = summaryTasks.map(async (task) => {
+            const controller = abortControllers.get(task.id);
+            const signal = controller?.signal;
+
             try {
+                // 检查是否已取消
+                if (signal?.aborted) {
+                    throw new Error('Task cancelled');
+                }
+
                 if (showProgress) {
                     WBAP.UI.updateProgressTask(task.id, '处理中...', 10);
                 }
+
                 const content = await buildWorldbookContent([task.bookName]);
+
+                // 再次检查是否已取消
+                if (signal?.aborted) {
+                    throw new Error('Task cancelled');
+                }
+
                 const block = buildMemoryBlock({
                     userInput,
                     context,
@@ -1548,27 +1875,68 @@
                     preset
                 });
                 block.model = mem.model;
-                const result = await callMemoryEndpoint(block, task.endpoint, mem.model);
+
+                const result = await callMemoryEndpoint(block, task.endpoint, mem.model, signal);
+
                 if (showProgress) {
                     WBAP.UI.updateProgressTask(task.id, '完成', 100);
                 }
                 return result;
             } catch (e) {
-                Logger.error(TAG, 'summary task failed', task.name, e);
-                if (showProgress) {
-                    WBAP.UI.updateProgressTask(task.id, `失败: ${(e?.message || '').slice(0, 20)}`, 100);
+                // 检查是否是取消错误
+                if (e.name === 'AbortError' || e.message === 'Task cancelled') {
+                    Logger.log(TAG, 'summary task cancelled', task.name);
+                    if (showProgress) {
+                        WBAP.UI.updateProgressTask(task.id, '已取消', 100);
+                    }
+                    return '';
                 }
+
+                // 处理其他错误
+                const errorMsg = e.message || '未知错误';
+                Logger.error(TAG, 'summary task failed', task.name, e);
+
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(task.id, '失败', 100);
+                }
+
+                // 显示用户友好的错误提示（只对第一个失败的任务显示，避免过多提示）
+                if (window.toastr && summaryPromises.indexOf(task) === 0) {
+                    if (errorMsg.includes('timeout') || errorMsg.includes('超时')) {
+                        toastr.error('总结书处理超时，请检查网络连接', '处理失败', { timeOut: 5000 });
+                    } else if (errorMsg.includes('401') || errorMsg.includes('403')) {
+                        toastr.error('API认证失败，请检查密钥配置', '处理失败', { timeOut: 5000 });
+                    } else {
+                        toastr.error(`总结书处理失败: ${errorMsg}`, '错误', { timeOut: 5000 });
+                    }
+                }
+
                 return '';
             }
         });
 
         // 创建表格书任务
         const tablePromises = tableTasks.map(async (task) => {
+            const controller = abortControllers.get(task.id);
+            const signal = controller?.signal;
+
             try {
+                // 检查是否已取消
+                if (signal?.aborted) {
+                    throw new Error('Task cancelled');
+                }
+
                 if (showProgress) {
                     WBAP.UI.updateProgressTask(task.id, '处理中...', 10);
                 }
+
                 const tableContent = await loadCategoryContent(task.bookName, task.category);
+
+                // 再次检查是否已取消
+                if (signal?.aborted) {
+                    throw new Error('Task cancelled');
+                }
+
                 const block = buildMemoryBlock({
                     userInput,
                     context,
@@ -1577,28 +1945,73 @@
                     preset
                 });
                 block.model = mem.model;
-                const result = await callMemoryEndpoint(block, task.endpoint, mem.model);
+
+                const result = await callMemoryEndpoint(block, task.endpoint, mem.model, signal);
+
                 if (showProgress) {
                     WBAP.UI.updateProgressTask(task.id, '完成', 100);
                 }
                 return result;
             } catch (e) {
-                Logger.error(TAG, 'table task failed', task.name, e);
-                if (showProgress) {
-                    WBAP.UI.updateProgressTask(task.id, `失败: ${(e?.message || '').slice(0, 20)}`, 100);
+                // 检查是否是取消错误
+                if (e.name === 'AbortError' || e.message === 'Task cancelled') {
+                    Logger.log(TAG, 'table task cancelled', task.name);
+                    if (showProgress) {
+                        WBAP.UI.updateProgressTask(task.id, '已取消', 100);
+                    }
+                    return '';
                 }
+
+                // 处理其他错误
+                const errorMsg = e.message || '未知错误';
+                Logger.error(TAG, 'table task failed', task.name, e);
+
+                if (showProgress) {
+                    WBAP.UI.updateProgressTask(task.id, '失败', 100);
+                }
+
+                // 显示用户友好的错误提示（只对第一个失败的任务显示）
+                if (window.toastr && tablePromises.indexOf(task) === 0) {
+                    if (errorMsg.includes('timeout') || errorMsg.includes('超时')) {
+                        toastr.error('表格书处理超时，请检查网络连接', '处理失败', { timeOut: 5000 });
+                    } else if (errorMsg.includes('401') || errorMsg.includes('403')) {
+                        toastr.error('API认证失败，请检查密钥配置', '处理失败', { timeOut: 5000 });
+                    } else {
+                        toastr.error(`表格书处理失败: ${errorMsg}`, '错误', { timeOut: 5000 });
+                    }
+                }
+
                 return '';
             }
         });
 
-        // 并发执行所有任务
-        const [snapshotResult, summaryResults, tableResults] = await Promise.all([
+        // 并发执行所有任务 - 使用 Promise.allSettled 处理部分失败
+        const results = await Promise.allSettled([
             snapshotPromise,
             Promise.all(summaryPromises),
             Promise.all(tablePromises)
         ]);
 
-        // 注意：不在这里隐藏进度面板，由 interceptor 统一管理
+        // 提取结果，即使部分任务失败也能继续
+        const snapshotResult = results[0].status === 'fulfilled' ? results[0].value : '';
+        const summaryResults = results[1].status === 'fulfilled' ? results[1].value : [];
+        const tableResults = results[2].status === 'fulfilled' ? results[2].value : [];
+
+        // 记录失败的任务
+        if (results[0].status === 'rejected') {
+            Logger.error(TAG, '快照任务失败', results[0].reason);
+        }
+        if (results[1].status === 'rejected') {
+            Logger.error(TAG, '总结书任务失败', results[1].reason);
+        }
+        if (results[2].status === 'rejected') {
+            Logger.error(TAG, '表格书任务失败', results[2].reason);
+        }
+
+        // 清理 AbortController - 防止内存泄漏
+        abortControllers.clear();
+
+        // 注意：���在这里隐藏进度面板，由 interceptor 统一管理
         // 如果是独立调用（面板由本模块打开），则隐藏
         if (showProgress && !panelAlreadyOpen) {
             WBAP.UI.hideProgressPanel();

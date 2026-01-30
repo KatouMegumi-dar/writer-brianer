@@ -83,6 +83,7 @@
         'persistent_storage.js', // 持久化存储模块
         'config.js',
         'storage_ui.js', // 存储管理UI
+        'diagnostic.js', // 诊断工具
         'ui_templates.js',
         'api.js',
         'stream_utils.js',
