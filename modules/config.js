@@ -950,30 +950,40 @@
         return superCfg;
     }
 
-    function loadConfig() {
+    async function loadConfig() {
         try {
             let loadedConfig = null;
             let loadSource = 'default';
 
-            // 1. 尝试从ST读取
-            if (typeof SillyTavern !== 'undefined' && SillyTavern.getContext) {
-                const { extensionSettings } = SillyTavern.getContext();
-                if (extensionSettings && extensionSettings[EXTENSION_NAME]) {
-                    loadedConfig = extensionSettings[EXTENSION_NAME];
-                    loadSource = 'ST';
-                    Logger.log('主配置已从 SillyTavern 读取');
-                }
-            }
+            // 使用增强的持久化存储模块（四层加载策略）
+            if (WBAP.PersistentStorage) {
+                const result = await WBAP.PersistentStorage.loadConfig();
+                loadedConfig = result.config;
+                loadSource = result.source;
+            } else {
+                // 降级到旧的加载方式
+                Logger.warn('持久化存储模块未加载，使用传统加载方式');
 
-            // 2. 如果ST配置为空或无效，尝试从localStorage恢复
-            if (!loadedConfig || !loadedConfig.characterConfigs) {
-                const backup = loadConfigFromLocalStorage();
-                if (backup && backup.characterConfigs) {
-                    loadedConfig = backup;
-                    loadSource = 'localStorage';
-                    Logger.log('从localStorage恢复配置');
-                    if (window.toastr) {
-                        toastr.info('已从本地备份恢复配置', '数据恢复');
+                // 1. 尝试从ST读取
+                if (typeof SillyTavern !== 'undefined' && SillyTavern.getContext) {
+                    const { extensionSettings } = SillyTavern.getContext();
+                    if (extensionSettings && extensionSettings[EXTENSION_NAME]) {
+                        loadedConfig = extensionSettings[EXTENSION_NAME];
+                        loadSource = 'ST';
+                        Logger.log('主配置已从 SillyTavern 读取');
+                    }
+                }
+
+                // 2. 如果ST配置为空或无效，尝试从localStorage恢复
+                if (!loadedConfig || !loadedConfig.characterConfigs) {
+                    const backup = loadConfigFromLocalStorage();
+                    if (backup && backup.characterConfigs) {
+                        loadedConfig = backup;
+                        loadSource = 'localStorage';
+                        Logger.log('从localStorage恢复配置');
+                        if (window.toastr) {
+                            toastr.info('已从本地备份恢复配置', '数据恢复');
+                        }
                     }
                 }
             }
@@ -994,7 +1004,7 @@
                 // 执行配置迁移
                 if (migrateConfig(mainConfig)) {
                     Logger.log('配置已从旧版本迁移并保存');
-                    saveConfig();
+                    await saveConfig();
                 }
             }
 
@@ -1018,25 +1028,42 @@
         }
     }
 
-    function saveConfig() {
+    async function saveConfig() {
         try {
-            // 1. 先保存到localStorage（立即生效）
-            const backupSuccess = saveConfigToLocalStorage(window.WBAP.mainConfig);
+            // 使用增强的持久化存储模块（四层保存策略）
+            if (WBAP.PersistentStorage) {
+                const results = await WBAP.PersistentStorage.saveConfig(window.WBAP.mainConfig);
 
-            // 2. 再保存到ST配置
-            if (typeof SillyTavern !== 'undefined' && SillyTavern.getContext) {
-                const { extensionSettings, saveSettingsDebounced } = SillyTavern.getContext();
-                if (extensionSettings) {
-                    extensionSettings[EXTENSION_NAME] = window.WBAP.mainConfig;
-                    if (typeof saveSettingsDebounced === 'function') {
-                        saveSettingsDebounced();
+                // 检查保存结果
+                const successCount = Object.values(results).filter(Boolean).length;
+                if (successCount === 0) {
+                    throw new Error('所有存储层保存失败');
+                }
+
+                Logger.log(`配置已保存到 ${successCount} 个存储层`);
+                return results;
+            } else {
+                // 降级到旧的保存方式
+                Logger.warn('持久化存储模块未加载，使用传统保存方式');
+
+                // 1. 先保存到localStorage（立即生效）
+                const backupSuccess = saveConfigToLocalStorage(window.WBAP.mainConfig);
+
+                // 2. 再保存到ST配置
+                if (typeof SillyTavern !== 'undefined' && SillyTavern.getContext) {
+                    const { extensionSettings, saveSettingsDebounced } = SillyTavern.getContext();
+                    if (extensionSettings) {
+                        extensionSettings[EXTENSION_NAME] = window.WBAP.mainConfig;
+                        if (typeof saveSettingsDebounced === 'function') {
+                            saveSettingsDebounced();
+                        }
                     }
                 }
-            }
 
-            // 3. 如果localStorage备份失败，通知用户
-            if (!backupSuccess && window.toastr) {
-                toastr.warning('配置备份失败，请检查浏览器存储空间', '警告');
+                // 3. 如果localStorage备份失败，通知用户
+                if (!backupSuccess && window.toastr) {
+                    toastr.warning('配置备份失败，请检查浏览器存储空间', '警告');
+                }
             }
         } catch (e) {
             Logger.error('保存主配置失败', e);

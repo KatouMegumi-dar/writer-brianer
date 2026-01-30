@@ -314,14 +314,7 @@
         });
 
         // 初始化记忆状态徽章
-        const memStatus = document.getElementById('wbap-memory-status');
-        if (memStatus) {
-            const cfg = WBAP.CharacterManager?.getCurrentCharacterConfig?.() || WBAP.config;
-            const enabled = cfg?.memoryModule?.enabled === true;
-            memStatus.textContent = enabled ? '已启用' : '未启用';
-            memStatus.classList.toggle('wbap-badge-success', enabled);
-            memStatus.classList.add('wbap-badge');
-        }
+        updateMemoryStatus();
 
         const promptSelect = document.getElementById('wbap-prompt-preset-select');
         promptSelect?.addEventListener('change', () => {
@@ -2306,6 +2299,17 @@
     }
 
     // 记忆模块状态刷新（首页卡片）
+    function updateMemoryStatus() {
+        const memStatus = document.getElementById('wbap-memory-status');
+        if (memStatus) {
+            const cfg = WBAP.CharacterManager?.getCurrentCharacterConfig?.() || WBAP.config;
+            const enabled = cfg?.memoryModule?.enabled === true;
+            memStatus.textContent = enabled ? '已启用' : '未启用';
+            memStatus.classList.toggle('wbap-badge-success', enabled);
+            memStatus.classList.add('wbap-badge');
+        }
+    }
+
     function bindMemorySection() {
         const btn = document.getElementById('wbap-memory-open-btn');
         if (btn) {
@@ -2315,14 +2319,8 @@
                 }
             };
         }
-        const memStatus = document.getElementById('wbap-memory-status');
-        if (memStatus) {
-            const cfg = WBAP.CharacterManager?.getCurrentCharacterConfig?.() || WBAP.config;
-            const enabled = cfg?.memoryModule?.enabled === true;
-            memStatus.textContent = enabled ? '已启用' : '未启用';
-            memStatus.classList.toggle('wbap-badge-success', enabled);
-            memStatus.classList.add('wbap-badge');
-        }
+        // 初始化状态
+        updateMemoryStatus();
     }
 
     function closePromptEditor() {
@@ -3121,9 +3119,33 @@
 
     function makeElementResizable(element, handle, direction = 'se') {
         if (!handle) return;
-        const margin = 8;
-        const minWidth = 280;
-        const minHeight = 220;
+
+        // 响应式边距和尺寸限制
+        const isMobile = window.innerWidth <= 767;
+        const margin = isMobile ? 10 : 8;
+        const minWidth = isMobile ? 280 : 280;
+        const minHeight = isMobile ? 180 : 220;
+
+        // 移动端的最大尺寸限制
+        const getMaxDimensions = () => {
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+
+            if (isMobile) {
+                // 移动端：宽度最大为屏幕宽度减去边距，高度最大为60vh
+                return {
+                    maxWidth: vw - (margin * 2),
+                    maxHeight: Math.min(vh * 0.6, vh - 100) // 60vh 或者屏幕高度减去100px
+                };
+            } else {
+                // 桌面端：更宽松的限制
+                return {
+                    maxWidth: vw - (margin * 2),
+                    maxHeight: vh * 0.8 // 80vh
+                };
+            }
+        };
+
         let pointerId = null;
         let startX = 0;
         let startY = 0;
@@ -3179,36 +3201,61 @@
             const dy = e.clientY - startY;
 
             let nextWidth, nextHeight, nextLeft, nextTop;
+            const { maxWidth: absoluteMaxWidth, maxHeight: absoluteMaxHeight } = getMaxDimensions();
 
             // 根据方向计算新的尺寸和位置
             if (direction === 'se') {
                 // 右下角：增加宽高
-                const maxWidth = Math.max(minWidth, window.innerWidth - startLeft - margin);
-                const maxHeight = Math.max(minHeight, window.innerHeight - startTop - margin);
+                const maxWidth = Math.min(
+                    absoluteMaxWidth,
+                    Math.max(minWidth, window.innerWidth - startLeft - margin)
+                );
+                const maxHeight = Math.min(
+                    absoluteMaxHeight,
+                    Math.max(minHeight, window.innerHeight - startTop - margin)
+                );
                 nextWidth = Math.min(maxWidth, Math.max(minWidth, startWidth + dx));
                 nextHeight = Math.min(maxHeight, Math.max(minHeight, startHeight + dy));
                 nextLeft = startLeft;
                 nextTop = startTop;
             } else if (direction === 'sw') {
                 // 左下角：左边界移动，宽度反向变化
-                const maxWidth = Math.max(minWidth, startLeft + startWidth - margin);
-                const maxHeight = Math.max(minHeight, window.innerHeight - startTop - margin);
+                const maxWidth = Math.min(
+                    absoluteMaxWidth,
+                    Math.max(minWidth, startLeft + startWidth - margin)
+                );
+                const maxHeight = Math.min(
+                    absoluteMaxHeight,
+                    Math.max(minHeight, window.innerHeight - startTop - margin)
+                );
                 nextWidth = Math.min(maxWidth, Math.max(minWidth, startWidth - dx));
                 nextHeight = Math.min(maxHeight, Math.max(minHeight, startHeight + dy));
                 nextLeft = startLeft + startWidth - nextWidth;
                 nextTop = startTop;
             } else if (direction === 'ne') {
                 // 右上角：上边界移动，高度反向变化
-                const maxWidth = Math.max(minWidth, window.innerWidth - startLeft - margin);
-                const maxHeight = Math.max(minHeight, startTop + startHeight - margin);
+                const maxWidth = Math.min(
+                    absoluteMaxWidth,
+                    Math.max(minWidth, window.innerWidth - startLeft - margin)
+                );
+                const maxHeight = Math.min(
+                    absoluteMaxHeight,
+                    Math.max(minHeight, startTop + startHeight - margin)
+                );
                 nextWidth = Math.min(maxWidth, Math.max(minWidth, startWidth + dx));
                 nextHeight = Math.min(maxHeight, Math.max(minHeight, startHeight - dy));
                 nextLeft = startLeft;
                 nextTop = startTop + startHeight - nextHeight;
             } else if (direction === 'nw') {
                 // 左上角：左边界和上边界都移动
-                const maxWidth = Math.max(minWidth, startLeft + startWidth - margin);
-                const maxHeight = Math.max(minHeight, startTop + startHeight - margin);
+                const maxWidth = Math.min(
+                    absoluteMaxWidth,
+                    Math.max(minWidth, startLeft + startWidth - margin)
+                );
+                const maxHeight = Math.min(
+                    absoluteMaxHeight,
+                    Math.max(minHeight, startTop + startHeight - margin)
+                );
                 nextWidth = Math.min(maxWidth, Math.max(minWidth, startWidth - dx));
                 nextHeight = Math.min(maxHeight, Math.max(minHeight, startHeight - dy));
                 nextLeft = startLeft + startWidth - nextWidth;
@@ -3280,6 +3327,7 @@
         refreshOptimizationPromptList,
         refreshSecondaryPromptUI,
         refreshTiagangPromptList,
+        updateMemoryStatus,
         isProgressPanelOpen,
         addToTotalTaskCount,
         showProgressPanel,

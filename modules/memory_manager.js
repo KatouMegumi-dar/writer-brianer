@@ -1075,6 +1075,10 @@
             mem.enabled = !!e.target.checked;
             saveConfig();
             renderStatusChip();
+            // 更新首页面板的记忆状态徽章
+            if (typeof WBAP.UI?.updateMemoryStatus === 'function') {
+                WBAP.UI.updateMemoryStatus();
+            }
         });
 
         modal.querySelector('#wbap-memory-api-btn')?.addEventListener('click', (e) => {
@@ -1108,6 +1112,10 @@
             });
             saveConfig();
             renderStatusChip();
+            // 更新首页面板的记忆状态徽章
+            if (typeof WBAP.UI?.updateMemoryStatus === 'function') {
+                WBAP.UI.updateMemoryStatus();
+            }
             modal.classList.remove('open');
         });
 

@@ -80,7 +80,9 @@
     // 3. 要加载的脚本（顺序很重要）
     const SCRIPTS_TO_LOAD = [
         'character_manager.js', // 必须最先加载
+        'persistent_storage.js', // 持久化存储模块
         'config.js',
+        'storage_ui.js', // 存储管理UI
         'ui_templates.js',
         'api.js',
         'stream_utils.js',
