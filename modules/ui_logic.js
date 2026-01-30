@@ -1022,6 +1022,15 @@
 
         document.getElementById('wbap-tiagang-save')?.addEventListener('click', () => saveTiagangSettings());
 
+        // 天纲接入渠道切换事件
+        document.getElementById('wbap-tiagang-channel')?.addEventListener('change', (e) => {
+            const isBackend = e.target.value === 'st-backend';
+            const backendFields = document.querySelectorAll('.wbap-tiagang-backend-only');
+            backendFields.forEach(field => {
+                field.style.display = isBackend ? '' : 'none';
+            });
+        });
+
         document.getElementById('wbap-tiagang-context-rounds')?.addEventListener('input', (e) => {
             const valueEl = document.getElementById('wbap-tiagang-context-rounds-value');
             if (valueEl) valueEl.textContent = e.target.value;
@@ -1637,6 +1646,8 @@
         }
 
         const apiCfg = globalTg.apiConfig || {};
+        const channelEl = document.getElementById('wbap-tiagang-channel');
+        const providerEl = document.getElementById('wbap-tiagang-provider');
         const apiUrlEl = document.getElementById('wbap-tiagang-api-url');
         const apiKeyEl = document.getElementById('wbap-tiagang-api-key');
         const maxTokensEl = document.getElementById('wbap-tiagang-max-tokens');
@@ -1645,6 +1656,16 @@
         const maxRetriesEl = document.getElementById('wbap-tiagang-max-retries');
         const retryDelayEl = document.getElementById('wbap-tiagang-retry-delay');
         const streamingEl = document.getElementById('wbap-tiagang-streaming');
+        if (channelEl) channelEl.value = apiCfg.apiChannel || 'direct';
+        if (providerEl) providerEl.value = apiCfg.apiProvider || 'openai';
+
+        // 根据接入渠道显示/隐藏后端类型字段
+        const isBackend = (apiCfg.apiChannel || 'direct') === 'st-backend';
+        const backendFields = document.querySelectorAll('.wbap-tiagang-backend-only');
+        backendFields.forEach(field => {
+            field.style.display = isBackend ? '' : 'none';
+        });
+
         if (apiUrlEl) apiUrlEl.value = apiCfg.apiUrl || '';
         if (apiKeyEl) apiKeyEl.value = apiCfg.apiKey || '';
         if (maxTokensEl) maxTokensEl.value = apiCfg.maxTokens || 2000;
@@ -1678,6 +1699,8 @@
         tgCfg.contextRounds = Number.isFinite(roundsVal) ? roundsVal : (tgCfg.contextRounds ?? 5);
 
         const apiCfg = globalTg.apiConfig || {};
+        apiCfg.apiChannel = document.getElementById('wbap-tiagang-channel')?.value || 'direct';
+        apiCfg.apiProvider = document.getElementById('wbap-tiagang-provider')?.value || 'openai';
         apiCfg.apiUrl = document.getElementById('wbap-tiagang-api-url')?.value || '';
         apiCfg.apiKey = document.getElementById('wbap-tiagang-api-key')?.value || '';
         apiCfg.model = document.getElementById('wbap-tiagang-model')?.value || '';
@@ -3968,6 +3991,19 @@
         if (dedupeInput) {
             dedupeInput.checked = endpoint.dedupe !== false;
         }
+
+        // 加载 API 接入渠道
+        const channelSelect = document.getElementById('wbap-endpoint-edit-channel');
+        if (channelSelect) {
+            channelSelect.value = endpoint.apiChannel || 'direct';
+        }
+
+        // 加载后端类型
+        const providerInput = document.getElementById('wbap-endpoint-edit-provider');
+        if (providerInput) {
+            providerInput.value = endpoint.apiProvider || 'openai';
+        }
+
         // 兼容旧字段 url/key
         document.getElementById('wbap-endpoint-edit-url').value = endpoint.apiUrl || endpoint.url || '';
         document.getElementById('wbap-endpoint-edit-key').value = endpoint.apiKey || endpoint.key || '';
@@ -4033,6 +4069,8 @@
         if (!endpoint) return;
 
         endpoint.name = document.getElementById('wbap-endpoint-edit-name').value;
+        endpoint.apiChannel = document.getElementById('wbap-endpoint-edit-channel')?.value || 'direct';
+        endpoint.apiProvider = document.getElementById('wbap-endpoint-edit-provider')?.value || 'openai';
         endpoint.apiUrl = document.getElementById('wbap-endpoint-edit-url').value;
         endpoint.apiKey = document.getElementById('wbap-endpoint-edit-key').value;
         endpoint.model = document.getElementById('wbap-endpoint-edit-model').value;

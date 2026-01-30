@@ -622,6 +622,29 @@
                     <span class="wbap-section-title">API \u914d\u7f6e</span>
                 </div>
                 <div class="wbap-form-group">
+                    <label>API 接入渠道</label>
+                    <select id="wbap-tiagang-channel">
+                        <option value="direct">直连（浏览器）</option>
+                        <option value="st-backend">SillyTavern 后端</option>
+                    </select>
+                    <div class="wbap-text-muted" style="font-size:12px; margin-top:6px;">
+                        使用后端可提升稳定性与并发吞吐；直连则由浏览器直接访问。
+                    </div>
+                </div>
+                <div class="wbap-form-group wbap-tiagang-backend-only" style="display:none;">
+                    <label>后端类型（chat_completion_source）</label>
+                    <input type="text" id="wbap-tiagang-provider" list="wbap-tiagang-provider-list" placeholder="openai">
+                    <datalist id="wbap-tiagang-provider-list">
+                        <option value="openai">OpenAI</option>
+                        <option value="claude">Claude</option>
+                        <option value="google">Google</option>
+                        <option value="mistral">Mistral</option>
+                        <option value="cohere">Cohere</option>
+                        <option value="openrouter">OpenRouter</option>
+                    </datalist>
+                    <small class="wbap-text-muted">指定 SillyTavern 后端使用的 API 提供商类型</small>
+                </div>
+                <div class="wbap-form-group">
                     <label>\u5929\u7eb2 API URL</label>
                     <input type="text" id="wbap-tiagang-api-url" placeholder="https://api.example.com/v1">
                 </div>
