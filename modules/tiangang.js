@@ -269,7 +269,11 @@
                 normalizedConfig.model,
                 prompts.user,
                 prompts.system,
-                { ...normalizedConfig }
+                {
+                    ...normalizedConfig,
+                    enableCache: false,  // 禁用响应缓存，确保每次都真正执行
+                    dedupe: false        // 禁用请求去重，避免复用结果
+                }
             );
             const finalText = typeof result === 'string' ? result.trim() : '';
             if (showProgress) {

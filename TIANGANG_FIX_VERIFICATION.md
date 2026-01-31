@@ -10,11 +10,14 @@
 2. **AbortSignal污染** - 改进了 `normalizeApiConfig` 函数，明确排除旧的signal
 3. **配置对象清理** - 确保每次调用时使用干净的配置对象
 4. **API层防御性检查** - 在 `api.js` 中添加了已中止signal的检测
+5. **CSRF Token错误** - 在 `persistent_storage.js` 中添加了请求头获取
+6. **缓存和去重问题** - 在天纲调用时禁用缓存和请求去重 ⭐ 关键修复
 
 ### 修改的文件
 
-- `modules/tiangang.js` (3处修改)
+- `modules/tiangang.js` (4处修改)
 - `modules/api.js` (1处修改)
+- `modules/persistent_storage.js` (5处修改)
 
 ---
 
