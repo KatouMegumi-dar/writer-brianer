@@ -23,23 +23,48 @@
 
 ## 📚 文档
 
-所有改进相关的文档都在 [`docs/`](docs/) 目录中：
+所有改进和修复相关的文档都在 [`docs/`](docs/) 目录中：
 
-### [IMPROVEMENTS.md](docs/IMPROVEMENTS.md)
+### 核心文档
+
+#### [IMPROVEMENTS.md](docs/IMPROVEMENTS.md)
 详细的改进说明，包括：
 - 改进内容和技术细节
 - 改进前后对比
 - 配置架构说明
 - 回滚方法
 
-### [VERIFICATION_CHECKLIST.md](docs/VERIFICATION_CHECKLIST.md)
+#### [VERIFICATION_CHECKLIST.md](docs/VERIFICATION_CHECKLIST.md)
 完整的验证清单，包括：
 - 8个详细验证步骤
 - 常见问题排查
 - 回滚步骤
 - 验证通过标准
 
-### [diagnostic.js](docs/diagnostic.js)
+### 修复文档（2026-01-31）
+
+#### [TIANGANG_FIX_VERIFICATION.md](docs/TIANGANG_FIX_VERIFICATION.md)
+天纲模块修复验证指南：
+- 修复的6个问题
+- 详细验证步骤
+- 故障排查方法
+
+#### [COMPLETE_FIX_REPORT.md](docs/COMPLETE_FIX_REPORT.md)
+完整修复报告：
+- 根本原因分析
+- 技术深度分析
+- 修复前后对比
+- 为什么缓存是关键问题
+
+#### [FILE_STRUCTURE.md](docs/FILE_STRUCTURE.md)
+文件结构说明：
+- 完整目录结构
+- 文件用途说明
+- 清理建议
+
+### 诊断工具
+
+#### [diagnostic.js](docs/diagnostic.js)
 快速诊断脚本，用于：
 - 一键检查所有关键功能
 - 快速定位问题
