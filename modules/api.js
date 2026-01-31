@@ -234,7 +234,11 @@
             const baseTimeoutSignal = createTimeoutSignal(timeoutSec * 1000);
             let mergedSignal = baseTimeoutSignal;
             if (apiConfig?.signal) {
-                if (typeof AbortSignal.any === 'function') {
+                // 检查传入的signal是否已经aborted，避免使用已失效的signal
+                if (apiConfig.signal.aborted) {
+                    Logger.warn('API调用收到已中止的signal，将仅使用timeout signal');
+                    mergedSignal = baseTimeoutSignal;
+                } else if (typeof AbortSignal.any === 'function') {
                     mergedSignal = AbortSignal.any([apiConfig.signal, baseTimeoutSignal]);
                 } else {
                     const controller = new AbortController();

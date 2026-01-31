@@ -74,8 +74,12 @@
         const maxRetries = Number.isInteger(apiConfig.maxRetries) ? Math.max(0, apiConfig.maxRetries) : 2;
         const retryDelayMs = Number.isFinite(apiConfig.retryDelayMs) ? apiConfig.retryDelayMs : 800;
         const enableStreaming = apiConfig.enableStreaming !== false;
+
+        // 创建新对象，明确排除旧的signal以避免污染
+        const { signal: _oldSignal, ...cleanConfig } = apiConfig;
+
         return {
-            ...apiConfig,
+            ...cleanConfig,
             apiUrl: apiConfig.apiUrl || apiConfig.url || '',
             apiKey: apiConfig.apiKey || apiConfig.key || '',
             timeout: timeout,
@@ -83,7 +87,7 @@
             retryDelayMs: retryDelayMs,
             enableStreaming: enableStreaming,
             priority: apiConfig.priority || 'high',
-            signal: signal
+            signal: signal  // 使用新的signal
         };
     }
 
@@ -248,7 +252,7 @@
         const controller = externalSignal ? null : new AbortController();
         const activeSignal = externalSignal || controller?.signal;
         const showProgress = !options.suppressProgress && config?.showProgressPanel && WBAP.UI;
-        const taskId = 'wbap-tiagang';
+        const taskId = 'wbap-tiangang';
         if (showProgress) {
             WBAP.UI.showProgressPanel('\u5929\u7eb2\u5904\u7406\u4e2d...', 1);
             WBAP.UI.addProgressTask(taskId, '\u5929\u7eb2\u5904\u7406', '\u7b49\u5f85\u4e2d...');

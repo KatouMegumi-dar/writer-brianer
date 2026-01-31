@@ -57,15 +57,38 @@
     }
 
     /**
+     * 获取请求头（包含CSRF token）
+     */
+    function getRequestHeaders() {
+        try {
+            if (typeof SillyTavern !== 'undefined' && SillyTavern.getContext) {
+                const ctx = SillyTavern.getContext();
+                if (typeof ctx?.getRequestHeaders === 'function') {
+                    return ctx.getRequestHeaders();
+                }
+            }
+        } catch (e) {
+            Logger.warn('无法获取请求头，使用默认值', e);
+        }
+        if (typeof window !== 'undefined' && typeof window.getRequestHeaders === 'function') {
+            try {
+                return window.getRequestHeaders();
+            } catch (e) {
+                Logger.warn('无法从window获取请求头', e);
+            }
+        }
+        return { 'Content-Type': 'application/json' };
+    }
+
+    /**
      * 从文件系统读取配置
      */
     async function readFromFileSystem(path) {
         try {
+            const headers = getRequestHeaders();
             const response = await fetch('/api/files/get', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: headers,
                 body: JSON.stringify({ path })
             });
 
@@ -93,11 +116,10 @@
             const jsonString = JSON.stringify(data, null, 2);
             const base64Data = btoa(unescape(encodeURIComponent(jsonString)));
 
+            const headers = getRequestHeaders();
             const response = await fetch('/api/files/upload', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: headers,
                 body: JSON.stringify({
                     name: path,
                     data: base64Data
@@ -121,11 +143,10 @@
      */
     async function listBackups() {
         try {
+            const headers = getRequestHeaders();
             const response = await fetch('/api/files/list', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: headers,
                 body: JSON.stringify({
                     path: STORAGE_PATHS.backups
                 })
@@ -160,11 +181,10 @@
             const toDelete = backups.slice(MAX_BACKUPS);
             for (const filename of toDelete) {
                 const path = `${STORAGE_PATHS.backups}/${filename}`;
+                const headers = getRequestHeaders();
                 await fetch('/api/files/delete', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: headers,
                     body: JSON.stringify({ path })
                 });
                 Logger.log(`已删除旧备份: ${filename}`);
