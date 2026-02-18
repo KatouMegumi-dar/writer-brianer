@@ -4649,6 +4649,7 @@
         setCancelAllCallback,
         clearCancelAllCallbacks,
         setCancelTaskCallback,
+        getWorldBookDisplayName,
         openApiEndpointEditor: (presetValue, onSave) => {
             const modal = document.getElementById('wbap-endpoint-editor-modal');
             if (!modal) return;
@@ -4937,6 +4938,15 @@
                 <button type="button" data-remove-book="${name}" class="wbap-btn wbap-btn-xs wbap-btn-icon" style="padding: 0 6px;">&times;</button>
             </span>
         `).join('');
+    }
+
+    // 将世界书名称转换为友好的显示名（去掉路径，保留文件名主体）
+    function getWorldBookDisplayName(bookName) {
+        if (!bookName) return '';
+        // 去掉路径分隔符后的文件名
+        const base = bookName.replace(/\\/g, '/').split('/').pop() || bookName;
+        // 去掉常见扩展名
+        return base.replace(/\.(json|lorebook)$/i, '');
     }
 
     // Helpers to detect and normalize table-style worldbooks (UI layer)

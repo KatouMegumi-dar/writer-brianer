@@ -2049,16 +2049,17 @@
         parts.push('<summary>记忆召回</summary>');
 
         // 总结书推理说明
+        // 总结书推理说明（只保留第一条，避免多分类重复）
         if (summaryReasonings.length > 0) {
             parts.push('<Summary_Reasoning>');
-            parts.push(summaryReasonings.join('\n'));
+            parts.push(summaryReasonings[0]);
             parts.push('</Summary_Reasoning>');
         }
 
-        // 表格书推理说明
+        // 表格书推理说明（只保留第一条，避免多分类重复）
         if (tableReasonings.length > 0) {
             parts.push('<Table_Reasoning>');
-            parts.push(tableReasonings.join('\n'));
+            parts.push(tableReasonings[0]);
             parts.push('</Table_Reasoning>');
         }
 
@@ -2210,6 +2211,16 @@
             }
         }
 
+        // 【修复前文污染】过滤前文中的历史记忆块，防止记忆LLM从中复制条目导致重复输出
+        if (context) {
+            context = context
+                .replace(/<memory>[\s\S]*?<\/memory>/gi, '')
+                .replace(/<details[^>]*>\s*<summary>\s*记忆召回\s*<\/summary>[\s\S]*?<\/details>/gi, '')
+                .replace(/<table_memory>[\s\S]*?<\/table_memory>/gi, '')
+                .replace(/<summary_memory>[\s\S]*?<\/summary_memory>/gi, '')
+                .trim();
+        }
+
         const preset = await ensureDefaultPreset(mem);
         const config = getCharacterConfig();
         const showProgress = config?.showProgressPanel && WBAP.UI;
@@ -2262,9 +2273,10 @@
                     const epId = mem.summaryEndpoints?.[summaryName]?.[cat];
                     const ep = findEndpointById(epId);
                     const limit = mem.summaryCategoryLimits?.[summaryName]?.[cat] || 6;
+                    const bookDisplayName = WBAP.UI?.getWorldBookDisplayName?.(summaryName) || summaryName;
                     summaryTasks.push({
                         id: `memory-summary-${summaryName}-${cat}`,
-                        name: `总结: ${WBAP.UI?.getWorldBookDisplayName?.(summaryName) || summaryName}: ${cat}`,
+                        name: `${bookDisplayName} / ${cat}`,
                         bookName: summaryName,
                         category: cat,
                         endpoint: ep,
@@ -2279,7 +2291,7 @@
                 const limit = typeof mem.summaryCategoryLimits?.[summaryName] === 'number' ? mem.summaryCategoryLimits[summaryName] : 6;
                 summaryTasks.push({
                     id: `memory-summary-${summaryName}`,
-                    name: `总结: ${WBAP.UI?.getWorldBookDisplayName?.(summaryName) || summaryName}`,
+                    name: `${WBAP.UI?.getWorldBookDisplayName?.(summaryName) || summaryName}`,
                     bookName: summaryName,
                     category: null,
                     endpoint: ep,
@@ -2296,9 +2308,10 @@
                 const epId = mem.tableCategoryEndpoints?.[bookName]?.[cat];
                 const ep = findEndpointById(epId);
                 const limit = mem.tableCategoryLimits?.[bookName]?.[cat] || 6;
+                const bookDisplayName = WBAP.UI?.getWorldBookDisplayName?.(bookName) || bookName;
                 tableTasks.push({
                     id: `memory-table-${bookName}-${cat}`,
-                    name: `表格: ${WBAP.UI?.getWorldBookDisplayName?.(bookName) || bookName}: ${cat}`,
+                    name: `${bookDisplayName} / ${cat}`,
                     bookName,
                     category: cat,
                     endpoint: ep,

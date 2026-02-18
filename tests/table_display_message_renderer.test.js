@@ -119,10 +119,7 @@ describe('renderTableArea', () => {
 
     it('renders area with header and tabs for tables', () => {
         setupTableWithRows(['Col1'], [['val1']]);
-<<<<<<< HEAD
         TD.setEnabled(true);
-=======
->>>>>>> dae4bfa60fca13428926bfd24c57114d55975830
         const area = TD.renderTableArea(1);
 
         expect(area).not.toBeNull();
@@ -143,10 +140,7 @@ describe('renderTableArea', () => {
 
     it('toggles collapse on header click', () => {
         setupTableWithRows(['A'], [['1']]);
-<<<<<<< HEAD
         TD.setEnabled(true);
-=======
->>>>>>> dae4bfa60fca13428926bfd24c57114d55975830
         const area = TD.renderTableArea(1);
         const header = area.querySelector('.wbap-td-header');
         const body = area.querySelector('.wbap-td-body');
@@ -164,11 +158,7 @@ describe('renderTableArea', () => {
         // Create two tables
         setupTableWithRows(['A'], [['1']]);
         setupTableWithRows(['B'], [['2']]);
-<<<<<<< HEAD
         TD.setEnabled(true);
-=======
-
->>>>>>> dae4bfa60fca13428926bfd24c57114d55975830
         const area = TD.renderTableArea(1);
         const tabs = area.querySelectorAll('.wbap-td-tab');
         const panels = area.querySelectorAll('.wbap-td-panel');
