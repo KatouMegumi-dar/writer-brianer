@@ -1,0 +1,12 @@
+{
+    "display_name": "笔者之脑",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "加藤惠哒！",
+    "version": "2.1.0",
+    "homePage": "",
+    "auto_update": false
+}

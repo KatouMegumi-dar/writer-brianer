@@ -1,0 +1,29 @@
+[package]
+name = "pedsa_wasm_v3"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[dependencies]
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1.7"
+aho-corasick = "1.1"
+# 强制依赖版本以解决 getrandom 0.3+ 问题
+ahash = { version = "0.8", default-features = false, features = ["compile-time-rng", "std"] }
+rand = { version = "0.8.5", features = ["small_rng"] }
+smallvec = "1.11"
+rayon = "1.8"
+instant = { version = "0.1", features = [ "wasm-bindgen" ] }
+twox-hash = "1.6" # 高速 64-bit 哈希，用于 SimHash
+memmap2 = "0.9"
+bytemuck = { version = "1.14", features = ["derive", "min_const_generics"] }
+half = { version = "2.3", features = ["bytemuck"] }
+getrandom = { version = "0.2", features = ["js"] }
+js-sys = "0.3"
+wasm-bindgen-futures = "0.4"
+# rusqlite = { version = "0.31", features = ["bundled"] } # Clang not found on Windows environment
