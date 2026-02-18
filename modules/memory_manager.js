@@ -1854,6 +1854,9 @@
         // 移除固定输出字段前缀
         content = content.replace(/^以下是[^：:]+[：:]\s*/i, '').trim();
 
+        // 移除 HTML 注释（如 <!-- INDEX_MC_SYJ_002 -->），这些不是有效内容
+        content = content.replace(/<!--[\s\S]*?-->/g, '').trim();
+
         // 检查是否为占位符文本
         for (const placeholder of PLACEHOLDER_TEXTS) {
             if (content === placeholder || content.includes(placeholder)) {
@@ -1999,7 +2002,9 @@
             const lines = item.split('\n').filter(l => l.trim());
             for (const line of lines) {
                 const trimmed = line.trim();
+                // 跳过空行、重复行、纯 HTML 注释行
                 if (!trimmed || seen.has(trimmed)) continue;
+                if (/^<!--[\s\S]*?-->$/.test(trimmed)) continue;  // 跳过纯注释行
 
                 seen.add(trimmed);
                 records.push(trimmed);
@@ -2276,7 +2281,7 @@
                     const bookDisplayName = WBAP.UI?.getWorldBookDisplayName?.(summaryName) || summaryName;
                     summaryTasks.push({
                         id: `memory-summary-${summaryName}-${cat}`,
-                        name: `${bookDisplayName} / ${cat}`,
+                        name: cat,
                         bookName: summaryName,
                         category: cat,
                         endpoint: ep,
@@ -2311,7 +2316,7 @@
                 const bookDisplayName = WBAP.UI?.getWorldBookDisplayName?.(bookName) || bookName;
                 tableTasks.push({
                     id: `memory-table-${bookName}-${cat}`,
-                    name: `${bookDisplayName} / ${cat}`,
+                    name: cat,
                     bookName,
                     category: cat,
                     endpoint: ep,
@@ -2539,6 +2544,12 @@
 
                 const tableContent = await loadCategoryContent(task.bookName, task.category);
 
+                // 诊断日志：记录表格内容长度
+                Logger.log(TAG, `表格任务 ${task.category}: tableContent长度=${tableContent?.length || 0}`);
+                if (tableContent && tableContent.length < 200) {
+                    Logger.log(TAG, `表格任务 ${task.category}: tableContent内容=${tableContent}`);
+                }
+
                 // 再次检查是否已取消
                 if (signal?.aborted) {
                     throw new Error('Task cancelled');
@@ -2555,6 +2566,12 @@
                 block.model = mem.model;
 
                 const result = await callMemoryEndpoint(block, task.endpoint || defaultEndpoint, mem.model, signal);
+
+                // 诊断日志：记录 LLM 返回的原始内容
+                Logger.log(TAG, `表格任务 ${task.category}: LLM返回长度=${result?.length || 0}`);
+                if (result && result.length < 500) {
+                    Logger.log(TAG, `表格任务 ${task.category}: LLM返回内容=${result}`);
+                }
 
                 if (showProgress) {
                     WBAP.UI.updateProgressTask(task.id, '完成', 100);
